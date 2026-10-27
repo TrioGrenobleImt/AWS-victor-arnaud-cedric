@@ -112,10 +112,10 @@ for i, az in enumerate(["a", "b"]):
 s.node(285, 168, 570, 66, "Application Load Balancer", ["HTTP :80 · health check /api/health · spans both AZs"], "net", "ALB")
 s.parts.append(f"<rect x='285' y='338' width='570' height='186' fill='none' stroke='{C['compute']}' stroke-width='1.5' stroke-dasharray='6 4'/>")
 s.text(295, 517, "Auto Scaling group", 13, C["compute"], "700")
-s.text(592, 517, "min 2 · max 3 · CPU 60 %", 12, C["compute"], "700")
+s.text(592, 517, "min 1 · max 2 · CPU 60 %", 12, C["compute"], "700")
 ec2_lines = ["Amazon Linux 2023 · IMDSv2", "gunicorn Flask API :8080", "worker: SQS consumer", "IAM instance profile"]
 s.node(297, 350, 236, 112, "EC2 t3.micro", ec2_lines, "compute", "EC2")
-s.node(597, 350, 236, 112, "EC2 t3.micro", ec2_lines, "compute", "EC2")
+s.node(597, 350, 236, 112, "EC2 t3.micro", ["added by scale-out (max 2)", "or with asg_min_size = 2", "same launch template", "replaces a failed instance"], "compute", "EC2", dashed=True)
 s.node(297, 600, 236, 112, "RDS MySQL 8.0", ["db.t4g.micro · single-AZ", "20 GB gp2 · encrypted (KMS)", "orders, order_items,", "order_events (audit)"], "db", "RDS")
 s.node(597, 600, 236, 112, "RDS standby", ["Multi-AZ (sync replica)", "disabled: not in Free Tier", "db_multi_az = true"], "db", "RDS", dashed=True)
 

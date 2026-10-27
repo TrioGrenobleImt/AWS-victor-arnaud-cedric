@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Resilience scenario: terminate one instance and watch the ASG replace it
 # while the site keeps answering through the remaining AZ.
+# Needs 2 running instances: terraform apply -var asg_min_size=2 (with 1, expect
+# 502/503 until the replacement passes its health checks).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 

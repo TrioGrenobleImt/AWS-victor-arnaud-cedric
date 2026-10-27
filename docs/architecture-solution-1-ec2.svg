@@ -30,18 +30,18 @@
 </g>
 <rect x='285' y='338' width='570' height='186' fill='none' stroke='#ED7100' stroke-width='1.5' stroke-dasharray='6 4'/>
 <text x='295' y='517' font-size='13' font-weight='700' fill='#ED7100' text-anchor='start'>Auto Scaling group</text>
-<text x='592' y='517' font-size='12' font-weight='700' fill='#ED7100' text-anchor='start'>min 2 · max 3 · CPU 60 %</text>
+<text x='592' y='517' font-size='12' font-weight='700' fill='#ED7100' text-anchor='start'>min 1 · max 2 · CPU 60 %</text>
 <g><rect x='297' y='350' width='236' height='112' rx='6' fill='#fff' stroke='#ED7100' stroke-width='1.6'/><rect x='307' y='362' width='34' height='34' rx='4' fill='#ED7100'/><text x='324' y='383' font-size='10.5' font-weight='700' fill='#fff' text-anchor='middle'>EC2</text><text x='349' y='376' font-size='13.5' font-weight='700' fill='#16191f'>EC2 t3.micro</text>
 <text x='349' y='393' font-size='11.5' fill='#5f6b7a'>Amazon Linux 2023 · IMDSv2</text>
 <text x='349' y='408' font-size='11.5' fill='#5f6b7a'>gunicorn Flask API :8080</text>
 <text x='349' y='423' font-size='11.5' fill='#5f6b7a'>worker: SQS consumer</text>
 <text x='349' y='438' font-size='11.5' fill='#5f6b7a'>IAM instance profile</text>
 </g>
-<g><rect x='597' y='350' width='236' height='112' rx='6' fill='#fff' stroke='#ED7100' stroke-width='1.6'/><rect x='607' y='362' width='34' height='34' rx='4' fill='#ED7100'/><text x='624' y='383' font-size='10.5' font-weight='700' fill='#fff' text-anchor='middle'>EC2</text><text x='649' y='376' font-size='13.5' font-weight='700' fill='#16191f'>EC2 t3.micro</text>
-<text x='649' y='393' font-size='11.5' fill='#5f6b7a'>Amazon Linux 2023 · IMDSv2</text>
-<text x='649' y='408' font-size='11.5' fill='#5f6b7a'>gunicorn Flask API :8080</text>
-<text x='649' y='423' font-size='11.5' fill='#5f6b7a'>worker: SQS consumer</text>
-<text x='649' y='438' font-size='11.5' fill='#5f6b7a'>IAM instance profile</text>
+<g opacity='0.55'><rect x='597' y='350' width='236' height='112' rx='6' fill='#fff' stroke='#ED7100' stroke-width='1.6' stroke-dasharray='6 4'/><rect x='607' y='362' width='34' height='34' rx='4' fill='#ED7100'/><text x='624' y='383' font-size='10.5' font-weight='700' fill='#fff' text-anchor='middle'>EC2</text><text x='649' y='376' font-size='13.5' font-weight='700' fill='#16191f'>EC2 t3.micro</text>
+<text x='649' y='393' font-size='11.5' fill='#5f6b7a'>added by scale-out (max 2)</text>
+<text x='649' y='408' font-size='11.5' fill='#5f6b7a'>or with asg_min_size = 2</text>
+<text x='649' y='423' font-size='11.5' fill='#5f6b7a'>same launch template</text>
+<text x='649' y='438' font-size='11.5' fill='#5f6b7a'>replaces a failed instance</text>
 </g>
 <g><rect x='297' y='600' width='236' height='112' rx='6' fill='#fff' stroke='#C925D1' stroke-width='1.6'/><rect x='307' y='612' width='34' height='34' rx='4' fill='#C925D1'/><text x='324' y='633' font-size='10.5' font-weight='700' fill='#fff' text-anchor='middle'>RDS</text><text x='349' y='626' font-size='13.5' font-weight='700' fill='#16191f'>RDS MySQL 8.0</text>
 <text x='349' y='643' font-size='11.5' fill='#5f6b7a'>db.t4g.micro · single-AZ</text>

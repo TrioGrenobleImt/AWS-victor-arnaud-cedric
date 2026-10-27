@@ -22,14 +22,15 @@ variable "instance_type" {
 }
 
 variable "asg_min_size" {
-  description = "Minimum number of web/worker instances. 2 = one per AZ (high availability). Free Tier covers 750 h/month in total."
+  description = "Minimum number of web/worker instances. 1 stays within the 750 h/month Free Tier; set 2 for one instance per AZ (high availability)."
   type        = number
-  default     = 2
+  default     = 1
 }
 
 variable "asg_max_size" {
-  type    = number
-  default = 3
+  description = "Maximum number of instances reached by CPU target tracking under load."
+  type        = number
+  default     = 2
 }
 
 variable "db_instance_class" {
