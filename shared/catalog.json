@@ -1,0 +1,8 @@
+[
+  {"id": "p-001", "name": "Mechanical keyboard", "description": "Tenkeyless keyboard with brown switches", "price": 79.90, "stock": 50},
+  {"id": "p-002", "name": "Wireless mouse", "description": "Ergonomic 2.4 GHz mouse, 6 buttons", "price": 34.50, "stock": 120},
+  {"id": "p-003", "name": "27\" monitor", "description": "QHD IPS panel, 144 Hz", "price": 289.00, "stock": 15},
+  {"id": "p-004", "name": "USB-C hub", "description": "7-in-1 hub with HDMI and Ethernet", "price": 45.00, "stock": 80},
+  {"id": "p-005", "name": "Noise-cancelling headset", "description": "Bluetooth headset, 30 h battery", "price": 149.99, "stock": 30},
+  {"id": "p-006", "name": "Webcam 1080p", "description": "Full HD webcam with dual microphone", "price": 59.00, "stock": 60}
+]

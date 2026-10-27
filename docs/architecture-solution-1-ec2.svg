@@ -1,0 +1,131 @@
+<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1400 900' width='1400' height='900' font-family='Helvetica, Arial, sans-serif'>
+<defs><marker id='a' viewBox='0 0 10 10' refX='9' refY='5' markerWidth='7' markerHeight='7' orient='auto-start-reverse'><path d='M0,0 L10,5 L0,10 z' fill='#414d5c'/></marker><marker id='ad' viewBox='0 0 10 10' refX='9' refY='5' markerWidth='7' markerHeight='7' orient='auto-start-reverse'><path d='M0,0 L10,5 L0,10 z' fill='#8d99a8'/></marker></defs>
+<rect width='1400' height='900' fill='#ffffff'/>
+<text x='30' y='42' font-size='24' font-weight='700' fill='#16191f'>Solution 1 — EC2 (virtual machines)</text>
+<text x='30' y='66' font-size='14' fill='#5f6b7a'>Online shop on an Auto Scaling group behind an Application Load Balancer, RDS MySQL, SNS → SQS order processing · Terraform · Free Tier</text>
+<g><rect x='40' y='180' width='140' height='66' rx='6' fill='#fff' stroke='#232F3E' stroke-width='1.6'/><rect x='50' y='192' width='34' height='34' rx='4' fill='#232F3E'/><text x='67' y='213' font-size='10.5' font-weight='700' fill='#fff' text-anchor='middle'>USR</text><text x='92' y='206' font-size='13.5' font-weight='700' fill='#16191f'>Customers</text>
+<text x='92' y='223' font-size='11.5' fill='#5f6b7a'>web browser</text>
+</g>
+<rect x='210' y='90' width='1170' height='740' fill='none' stroke='#232F3E' stroke-width='1.5'/>
+<rect x='210' y='90' width='26' height='26' fill='#232F3E'/><text x='223' y='107' font-size='10' font-weight='700' fill='#fff' text-anchor='middle'>AWS</text>
+<text x='244' y='108' font-size='13' font-weight='700' fill='#232F3E'>AWS Cloud · region eu-west-3 (Paris)</text>
+<rect x='240' y='135' width='640' height='680' fill='none' stroke='#8C4FFF' stroke-width='1.5'/>
+<rect x='240' y='135' width='26' height='26' fill='#8C4FFF'/><text x='253' y='152' font-size='10' font-weight='700' fill='#fff' text-anchor='middle'>VPC</text>
+<text x='274' y='153' font-size='13' font-weight='700' fill='#8C4FFF'>VPC 10.10.0.0/16</text>
+<rect x='226' y='196' width='28' height='28' rx='4' fill='#8C4FFF'/><text x='240' y='214' font-size='9' font-weight='700' fill='#fff' text-anchor='middle'>IGW</text>
+<rect x='265' y='270' width='285' height='530' fill='none' stroke='#147EBA' stroke-width='1.5' stroke-dasharray='8 5'/>
+<text x='275' y='288' font-size='13' font-weight='700' fill='#147EBA'>Availability Zone eu-west-3a</text>
+<rect x='277' y='300' width='261' height='236' fill='#F2F8F0' stroke='#7AA116' stroke-width='1.5'/>
+<text x='287' y='318' font-size='13' font-weight='700' fill='#7AA116'>Public subnet 10.10.0.0/24</text>
+<rect x='277' y='556' width='261' height='232' fill='#E6F2F8' stroke='#147EBA' stroke-width='1.5'/>
+<text x='287' y='574' font-size='13' font-weight='700' fill='#147EBA'>Private subnet 10.10.10.0/24</text>
+<rect x='565' y='270' width='285' height='530' fill='none' stroke='#147EBA' stroke-width='1.5' stroke-dasharray='8 5'/>
+<text x='575' y='288' font-size='13' font-weight='700' fill='#147EBA'>Availability Zone eu-west-3b</text>
+<rect x='577' y='300' width='261' height='236' fill='#F2F8F0' stroke='#7AA116' stroke-width='1.5'/>
+<text x='587' y='318' font-size='13' font-weight='700' fill='#7AA116'>Public subnet 10.10.1.0/24</text>
+<rect x='577' y='556' width='261' height='232' fill='#E6F2F8' stroke='#147EBA' stroke-width='1.5'/>
+<text x='587' y='574' font-size='13' font-weight='700' fill='#147EBA'>Private subnet 10.10.11.0/24</text>
+<g><rect x='285' y='168' width='570' height='66' rx='6' fill='#fff' stroke='#8C4FFF' stroke-width='1.6'/><rect x='295' y='180' width='34' height='34' rx='4' fill='#8C4FFF'/><text x='312' y='201' font-size='10.5' font-weight='700' fill='#fff' text-anchor='middle'>ALB</text><text x='337' y='194' font-size='13.5' font-weight='700' fill='#16191f'>Application Load Balancer</text>
+<text x='337' y='211' font-size='11.5' fill='#5f6b7a'>HTTP :80 · health check /api/health · spans both AZs</text>
+</g>
+<rect x='285' y='338' width='570' height='186' fill='none' stroke='#ED7100' stroke-width='1.5' stroke-dasharray='6 4'/>
+<text x='295' y='517' font-size='13' font-weight='700' fill='#ED7100' text-anchor='start'>Auto Scaling group</text>
+<text x='592' y='517' font-size='12' font-weight='700' fill='#ED7100' text-anchor='start'>min 2 · max 3 · CPU 60 %</text>
+<g><rect x='297' y='350' width='236' height='112' rx='6' fill='#fff' stroke='#ED7100' stroke-width='1.6'/><rect x='307' y='362' width='34' height='34' rx='4' fill='#ED7100'/><text x='324' y='383' font-size='10.5' font-weight='700' fill='#fff' text-anchor='middle'>EC2</text><text x='349' y='376' font-size='13.5' font-weight='700' fill='#16191f'>EC2 t3.micro</text>
+<text x='349' y='393' font-size='11.5' fill='#5f6b7a'>Amazon Linux 2023 · IMDSv2</text>
+<text x='349' y='408' font-size='11.5' fill='#5f6b7a'>gunicorn Flask API :8080</text>
+<text x='349' y='423' font-size='11.5' fill='#5f6b7a'>worker: SQS consumer</text>
+<text x='349' y='438' font-size='11.5' fill='#5f6b7a'>IAM instance profile</text>
+</g>
+<g><rect x='597' y='350' width='236' height='112' rx='6' fill='#fff' stroke='#ED7100' stroke-width='1.6'/><rect x='607' y='362' width='34' height='34' rx='4' fill='#ED7100'/><text x='624' y='383' font-size='10.5' font-weight='700' fill='#fff' text-anchor='middle'>EC2</text><text x='649' y='376' font-size='13.5' font-weight='700' fill='#16191f'>EC2 t3.micro</text>
+<text x='649' y='393' font-size='11.5' fill='#5f6b7a'>Amazon Linux 2023 · IMDSv2</text>
+<text x='649' y='408' font-size='11.5' fill='#5f6b7a'>gunicorn Flask API :8080</text>
+<text x='649' y='423' font-size='11.5' fill='#5f6b7a'>worker: SQS consumer</text>
+<text x='649' y='438' font-size='11.5' fill='#5f6b7a'>IAM instance profile</text>
+</g>
+<g><rect x='297' y='600' width='236' height='112' rx='6' fill='#fff' stroke='#C925D1' stroke-width='1.6'/><rect x='307' y='612' width='34' height='34' rx='4' fill='#C925D1'/><text x='324' y='633' font-size='10.5' font-weight='700' fill='#fff' text-anchor='middle'>RDS</text><text x='349' y='626' font-size='13.5' font-weight='700' fill='#16191f'>RDS MySQL 8.0</text>
+<text x='349' y='643' font-size='11.5' fill='#5f6b7a'>db.t4g.micro · single-AZ</text>
+<text x='349' y='658' font-size='11.5' fill='#5f6b7a'>20 GB gp2 · encrypted (KMS)</text>
+<text x='349' y='673' font-size='11.5' fill='#5f6b7a'>orders, order_items,</text>
+<text x='349' y='688' font-size='11.5' fill='#5f6b7a'>order_events (audit)</text>
+</g>
+<g opacity='0.55'><rect x='597' y='600' width='236' height='112' rx='6' fill='#fff' stroke='#C925D1' stroke-width='1.6' stroke-dasharray='6 4'/><rect x='607' y='612' width='34' height='34' rx='4' fill='#C925D1'/><text x='624' y='633' font-size='10.5' font-weight='700' fill='#fff' text-anchor='middle'>RDS</text><text x='649' y='626' font-size='13.5' font-weight='700' fill='#16191f'>RDS standby</text>
+<text x='649' y='643' font-size='11.5' fill='#5f6b7a'>Multi-AZ (sync replica)</text>
+<text x='649' y='658' font-size='11.5' fill='#5f6b7a'>disabled: not in Free Tier</text>
+<text x='649' y='673' font-size='11.5' fill='#5f6b7a'>db_multi_az = true</text>
+</g>
+<g><rect x='925' y='200' width='200' height='70' rx='6' fill='#fff' stroke='#E7157B' stroke-width='1.6'/><rect x='935' y='212' width='34' height='34' rx='4' fill='#E7157B'/><text x='952' y='233' font-size='10.5' font-weight='700' fill='#fff' text-anchor='middle'>SNS</text><text x='977' y='226' font-size='13.5' font-weight='700' fill='#16191f'>Amazon SNS</text>
+<text x='977' y='243' font-size='11.5' fill='#5f6b7a'>topic order-events</text>
+<text x='977' y='258' font-size='11.5' fill='#5f6b7a'>encrypted (aws/sns)</text>
+</g>
+<g><rect x='1165' y='200' width='190' height='70' rx='6' fill='#fff' stroke='#232F3E' stroke-width='1.6'/><rect x='1175' y='212' width='34' height='34' rx='4' fill='#232F3E'/><text x='1192' y='233' font-size='10.5' font-weight='700' fill='#fff' text-anchor='middle'>@</text><text x='1217' y='226' font-size='13.5' font-weight='700' fill='#16191f'>Email subscribers</text>
+<text x='1217' y='243' font-size='11.5' fill='#5f6b7a'>order confirmed / shipped</text>
+</g>
+<g><rect x='925' y='400' width='200' height='70' rx='6' fill='#fff' stroke='#E7157B' stroke-width='1.6'/><rect x='935' y='412' width='34' height='34' rx='4' fill='#E7157B'/><text x='952' y='433' font-size='10.5' font-weight='700' fill='#fff' text-anchor='middle'>SQS</text><text x='977' y='426' font-size='13.5' font-weight='700' fill='#16191f'>Amazon SQS</text>
+<text x='977' y='443' font-size='11.5' fill='#5f6b7a'>order-processing</text>
+<text x='977' y='458' font-size='11.5' fill='#5f6b7a'>long polling 20 s</text>
+</g>
+<g><rect x='1165' y='400' width='190' height='70' rx='6' fill='#fff' stroke='#E7157B' stroke-width='1.6'/><rect x='1175' y='412' width='34' height='34' rx='4' fill='#E7157B'/><text x='1192' y='433' font-size='10.5' font-weight='700' fill='#fff' text-anchor='middle'>DLQ</text><text x='1217' y='426' font-size='13.5' font-weight='700' fill='#16191f'>Dead-letter queue</text>
+<text x='1217' y='443' font-size='11.5' fill='#5f6b7a'>after 3 failed attempts</text>
+</g>
+<rect x='912' y='530' width='455' height='112' fill='none' stroke='#5f6b7a' stroke-width='1.5' stroke-dasharray='6 4'/>
+<text x='922' y='548' font-size='13' font-weight='700' fill='#5f6b7a'>Instance bootstrap (user data)</text>
+<g><rect x='925' y='560' width='200' height='70' rx='6' fill='#fff' stroke='#7AA116' stroke-width='1.6'/><rect x='935' y='572' width='34' height='34' rx='4' fill='#7AA116'/><text x='952' y='593' font-size='10.5' font-weight='700' fill='#fff' text-anchor='middle'>S3</text><text x='977' y='586' font-size='13.5' font-weight='700' fill='#16191f'>Amazon S3</text>
+<text x='977' y='603' font-size='11.5' fill='#5f6b7a'>app code, catalog, frontend</text>
+<text x='977' y='618' font-size='11.5' fill='#5f6b7a'>versioned releases</text>
+</g>
+<g><rect x='1155' y='560' width='200' height='70' rx='6' fill='#fff' stroke='#E7157B' stroke-width='1.6'/><rect x='1165' y='572' width='34' height='34' rx='4' fill='#E7157B'/><text x='1182' y='593' font-size='10.5' font-weight='700' fill='#fff' text-anchor='middle'>SSM</text><text x='1207' y='586' font-size='13.5' font-weight='700' fill='#16191f'>SSM Parameter Store</text>
+<text x='1207' y='603' font-size='11.5' fill='#5f6b7a'>DB password</text>
+<text x='1207' y='618' font-size='11.5' fill='#5f6b7a'>SecureString</text>
+</g>
+<g><rect x='925' y='690' width='200' height='80' rx='6' fill='#fff' stroke='#E7157B' stroke-width='1.6'/><rect x='935' y='702' width='34' height='34' rx='4' fill='#E7157B'/><text x='952' y='723' font-size='10.5' font-weight='700' fill='#fff' text-anchor='middle'>CW</text><text x='977' y='716' font-size='13.5' font-weight='700' fill='#16191f'>Amazon CloudWatch</text>
+<text x='977' y='733' font-size='11.5' fill='#5f6b7a'>metrics ALB/ASG/RDS/SQS</text>
+<text x='977' y='748' font-size='11.5' fill='#5f6b7a'>4 alarms · dashboard</text>
+</g>
+<g><rect x='1165' y='690' width='190' height='80' rx='6' fill='#fff' stroke='#E7157B' stroke-width='1.6'/><rect x='1175' y='702' width='34' height='34' rx='4' fill='#E7157B'/><text x='1192' y='723' font-size='10.5' font-weight='700' fill='#fff' text-anchor='middle'>SNS</text><text x='1217' y='716' font-size='13.5' font-weight='700' fill='#16191f'>SNS alerts topic</text>
+<text x='1217' y='733' font-size='11.5' fill='#5f6b7a'>→ email (ops)</text>
+</g>
+<text x='925' y='790' font-size='11' font-weight='400' fill='#5f6b7a' text-anchor='start'>Security groups: ALB → app :8080 → DB :3306 · no SSH (SSM)</text>
+<text x='925' y='806' font-size='11' font-weight='400' fill='#5f6b7a' text-anchor='start'>Account baseline: AWS Budgets (1 USD alert) · CloudTrail → S3</text>
+<path d='M180,210 L226,210' fill='none' stroke='#414d5c' stroke-width='1.6' marker-end='url(#a)'/>
+<path d='M254,210 L285,210' fill='none' stroke='#414d5c' stroke-width='1.6' marker-end='url(#a)'/>
+<path d='M510,234 L510,350' fill='none' stroke='#414d5c' stroke-width='1.6' marker-end='url(#a)'/>
+<path d='M810,234 L810,350' fill='none' stroke='#414d5c' stroke-width='1.6' marker-end='url(#a)'/>
+<path d='M510,462 L510,600' fill='none' stroke='#414d5c' stroke-width='1.6' marker-end='url(#a)'/>
+<path d='M790,462 L790,546 L557,546 L557,630 L533,630' fill='none' stroke='#414d5c' stroke-width='1.6' marker-end='url(#a)'/>
+<path d='M533,680 L597,680' fill='none' stroke='#8d99a8' stroke-width='1.6' stroke-dasharray='6 4' marker-end='url(#ad)'/>
+<path d='M855,380 L905,380 L905,235 L925,235' fill='none' stroke='#414d5c' stroke-width='1.6' marker-end='url(#a)'/>
+<path d='M1125,235 L1165,235' fill='none' stroke='#414d5c' stroke-width='1.6' marker-end='url(#a)'/>
+<path d='M1025,270 L1025,400' fill='none' stroke='#414d5c' stroke-width='1.6' marker-end='url(#a)'/>
+<path d='M925,445 L855,445' fill='none' stroke='#414d5c' stroke-width='1.6' marker-end='url(#a)'/>
+<path d='M1125,435 L1165,435' fill='none' stroke='#414d5c' stroke-width='1.6' marker-end='url(#a)'/>
+<path d='M912,586 L868,586 L868,500 L855,500' fill='none' stroke='#8d99a8' stroke-width='1.6' stroke-dasharray='6 4' marker-end='url(#ad)'/>
+<path d='M1125,730 L1165,730' fill='none' stroke='#414d5c' stroke-width='1.6' marker-end='url(#a)'/>
+<line x1='30' y1='847' x2='1370' y2='847' stroke='#e9ebed'/>
+<text x='56' y='869' font-size='12' font-weight='400' fill='#414d5c' text-anchor='start'>Browse &amp; order via ALB</text>
+<text x='231.2' y='869' font-size='12' font-weight='400' fill='#414d5c' text-anchor='start'>Store order + publish event</text>
+<text x='439.4' y='869' font-size='12' font-weight='400' fill='#414d5c' text-anchor='start'>Email confirmation</text>
+<text x='588.2' y='869' font-size='12' font-weight='400' fill='#414d5c' text-anchor='start'>Worker packs &amp; ships</text>
+<text x='750.2' y='869' font-size='12' font-weight='400' fill='#414d5c' text-anchor='start'>Audit trail in RDS</text>
+<path d='M1070,865 L1110,865' stroke='#414d5c' stroke-width='1.6' marker-end='url(#a)'/>
+<text x='1118' y='869' font-size='12' font-weight='400' fill='#414d5c' text-anchor='start'>request / event</text>
+<path d='M1230,865 L1270,865' stroke='#8d99a8' stroke-width='1.6' stroke-dasharray='6 4' marker-end='url(#ad)'/>
+<text x='1278' y='869' font-size='12' font-weight='400' fill='#414d5c' text-anchor='start'>config / optional</text>
+<rect x='185.68' y='187' width='34.64' height='17' rx='3' fill='#fff' stroke='#d5dbe1'/><text x='203' y='200' font-size='11' fill='#414d5c' text-anchor='middle'>HTTP</text>
+<rect x='489.6' y='243' width='40.800000000000004' height='17' rx='3' fill='#fff' stroke='#d5dbe1'/><text x='510' y='256' font-size='11' fill='#414d5c' text-anchor='middle'>:8080</text>
+<rect x='789.6' y='243' width='40.800000000000004' height='17' rx='3' fill='#fff' stroke='#d5dbe1'/><text x='810' y='256' font-size='11' fill='#414d5c' text-anchor='middle'>:8080</text>
+<rect x='474.2' y='477' width='71.60000000000001' height='17' rx='3' fill='#fff' stroke='#d5dbe1'/><text x='510' y='490' font-size='11' fill='#414d5c' text-anchor='middle'>MySQL 3306</text>
+<rect x='879.44' y='301' width='53.120000000000005' height='17' rx='3' fill='#fff' stroke='#d5dbe1'/><text x='906' y='314' font-size='11' fill='#414d5c' text-anchor='middle'>publish</text>
+<rect x='958.4' y='326' width='133.20000000000002' height='17' rx='3' fill='#fff' stroke='#d5dbe1'/><text x='1025' y='339' font-size='11' fill='#414d5c' text-anchor='middle'>filter: ORDER_PLACED</text>
+<rect x='872.68' y='436' width='34.64' height='17' rx='3' fill='#fff' stroke='#d5dbe1'/><text x='890' y='449' font-size='11' fill='#414d5c' text-anchor='middle'>poll</text>
+<circle cx='195' cy='180' r='10' fill='#232F3E'/><text x='195' y='184' font-size='11' font-weight='700' fill='#fff' text-anchor='middle'>1</text>
+<circle cx='912' cy='380' r='10' fill='#232F3E'/><text x='912' y='384' font-size='11' font-weight='700' fill='#fff' text-anchor='middle'>2</text>
+<circle cx='1138' cy='222' r='10' fill='#232F3E'/><text x='1138' y='226' font-size='11' font-weight='700' fill='#fff' text-anchor='middle'>3</text>
+<circle cx='1038' cy='380' r='10' fill='#232F3E'/><text x='1038' y='384' font-size='11' font-weight='700' fill='#fff' text-anchor='middle'>4</text>
+<circle cx='523' cy='600' r='10' fill='#232F3E'/><text x='523' y='604' font-size='11' font-weight='700' fill='#fff' text-anchor='middle'>5</text>
+<circle cx='40' cy='865' r='10' fill='#232F3E'/><text x='40' y='869' font-size='11' font-weight='700' fill='#fff' text-anchor='middle'>1</text>
+<circle cx='215.2' cy='865' r='10' fill='#232F3E'/><text x='215.2' y='869' font-size='11' font-weight='700' fill='#fff' text-anchor='middle'>2</text>
+<circle cx='423.4' cy='865' r='10' fill='#232F3E'/><text x='423.4' y='869' font-size='11' font-weight='700' fill='#fff' text-anchor='middle'>3</text>
+<circle cx='572.2' cy='865' r='10' fill='#232F3E'/><text x='572.2' y='869' font-size='11' font-weight='700' fill='#fff' text-anchor='middle'>4</text>
+<circle cx='734.2' cy='865' r='10' fill='#232F3E'/><text x='734.2' y='869' font-size='11' font-weight='700' fill='#fff' text-anchor='middle'>5</text>
+</svg>

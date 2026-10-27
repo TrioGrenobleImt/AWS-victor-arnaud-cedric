@@ -1,0 +1,10 @@
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+.build/
+.terraform.lock.hcl.bak
+__pycache__/
+*.pyc
+.DS_Store

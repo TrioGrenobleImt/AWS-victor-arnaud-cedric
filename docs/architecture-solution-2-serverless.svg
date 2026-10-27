@@ -1,0 +1,118 @@
+<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1400 860' width='1400' height='860' font-family='Helvetica, Arial, sans-serif'>
+<defs><marker id='a' viewBox='0 0 10 10' refX='9' refY='5' markerWidth='7' markerHeight='7' orient='auto-start-reverse'><path d='M0,0 L10,5 L0,10 z' fill='#414d5c'/></marker><marker id='ad' viewBox='0 0 10 10' refX='9' refY='5' markerWidth='7' markerHeight='7' orient='auto-start-reverse'><path d='M0,0 L10,5 L0,10 z' fill='#8d99a8'/></marker></defs>
+<rect width='1400' height='860' fill='#ffffff'/>
+<text x='30' y='42' font-size='24' font-weight='700' fill='#16191f'>Solution 2 — Serverless</text>
+<text x='30' y='66' font-size='14' fill='#5f6b7a'>Static site on S3 + CloudFront, API Gateway + Lambda, DynamoDB with Streams, SNS → SQS order processing · Terraform · Free Tier</text>
+<g><rect x='20' y='345' width='130' height='66' rx='6' fill='#fff' stroke='#232F3E' stroke-width='1.6'/><rect x='30' y='357' width='34' height='34' rx='4' fill='#232F3E'/><text x='47' y='378' font-size='10.5' font-weight='700' fill='#fff' text-anchor='middle'>USR</text><text x='72' y='371' font-size='13.5' font-weight='700' fill='#16191f'>Customers</text>
+<text x='72' y='388' font-size='11.5' fill='#5f6b7a'>web browser</text>
+</g>
+<g><rect x='178' y='330' width='205' height='96' rx='6' fill='#fff' stroke='#8C4FFF' stroke-width='1.6'/><rect x='188' y='342' width='34' height='34' rx='4' fill='#8C4FFF'/><text x='205' y='363' font-size='10.5' font-weight='700' fill='#fff' text-anchor='middle'>CF</text><text x='230' y='356' font-size='13.5' font-weight='700' fill='#16191f'>Amazon CloudFront</text>
+<text x='230' y='373' font-size='11.5' fill='#5f6b7a'>global edge · HTTPS</text>
+<text x='230' y='388' font-size='11.5' fill='#5f6b7a'>PriceClass_100</text>
+<text x='230' y='403' font-size='11.5' fill='#5f6b7a'>/ → S3 · /api/* → API</text>
+</g>
+<rect x='400' y='90' width='975' height='700' fill='none' stroke='#232F3E' stroke-width='1.5'/>
+<rect x='400' y='90' width='26' height='26' fill='#232F3E'/><text x='413' y='107' font-size='10' font-weight='700' fill='#fff' text-anchor='middle'>AWS</text>
+<text x='434' y='108' font-size='13' font-weight='700' fill='#232F3E'>AWS Cloud · region eu-west-3 (Paris) — every service is managed and multi-AZ</text>
+<g><rect x='430' y='140' width='200' height='70' rx='6' fill='#fff' stroke='#7AA116' stroke-width='1.6'/><rect x='440' y='152' width='34' height='34' rx='4' fill='#7AA116'/><text x='457' y='173' font-size='10.5' font-weight='700' fill='#fff' text-anchor='middle'>S3</text><text x='482' y='166' font-size='13.5' font-weight='700' fill='#16191f'>S3 website bucket</text>
+<text x='482' y='183' font-size='11.5' fill='#5f6b7a'>index.html · private</text>
+<text x='482' y='198' font-size='11.5' fill='#5f6b7a'>Origin Access Control</text>
+</g>
+<g><rect x='430' y='340' width='200' height='70' rx='6' fill='#fff' stroke='#8C4FFF' stroke-width='1.6'/><rect x='440' y='352' width='34' height='34' rx='4' fill='#8C4FFF'/><text x='457' y='373' font-size='10.5' font-weight='700' fill='#fff' text-anchor='middle'>API</text><text x='482' y='366' font-size='13.5' font-weight='700' fill='#16191f'>API Gateway</text>
+<text x='482' y='383' font-size='11.5' fill='#5f6b7a'>HTTP API · $default</text>
+<text x='482' y='398' font-size='11.5' fill='#5f6b7a'>throttle 10 rps / burst 20</text>
+</g>
+<g><rect x='680' y='340' width='200' height='70' rx='6' fill='#fff' stroke='#ED7100' stroke-width='1.6'/><rect x='690' y='352' width='34' height='34' rx='4' fill='#ED7100'/><text x='707' y='373' font-size='10.5' font-weight='700' fill='#fff' text-anchor='middle'>λ</text><text x='732' y='366' font-size='13.5' font-weight='700' fill='#16191f'>Lambda api</text>
+<text x='732' y='383' font-size='11.5' fill='#5f6b7a'>python3.12 · arm64</text>
+<text x='732' y='398' font-size='11.5' fill='#5f6b7a'>routes /api/*</text>
+</g>
+<g><rect x='930' y='200' width='200' height='70' rx='6' fill='#fff' stroke='#C925D1' stroke-width='1.6'/><rect x='940' y='212' width='34' height='34' rx='4' fill='#C925D1'/><text x='957' y='233' font-size='10.5' font-weight='700' fill='#fff' text-anchor='middle'>DDB</text><text x='982' y='226' font-size='13.5' font-weight='700' fill='#16191f'>DynamoDB products</text>
+<text x='982' y='243' font-size='11.5' fill='#5f6b7a'>catalog · 5 RCU / 5 WCU</text>
+</g>
+<g><rect x='930' y='340' width='200' height='70' rx='6' fill='#fff' stroke='#C925D1' stroke-width='1.6'/><rect x='940' y='352' width='34' height='34' rx='4' fill='#C925D1'/><text x='957' y='373' font-size='10.5' font-weight='700' fill='#fff' text-anchor='middle'>DDB</text><text x='982' y='366' font-size='13.5' font-weight='700' fill='#16191f'>DynamoDB orders</text>
+<text x='982' y='383' font-size='11.5' fill='#5f6b7a'>orders + status history</text>
+<text x='982' y='398' font-size='11.5' fill='#5f6b7a'>stream NEW_AND_OLD</text>
+</g>
+<g><rect x='680' y='500' width='200' height='70' rx='6' fill='#fff' stroke='#E7157B' stroke-width='1.6'/><rect x='690' y='512' width='34' height='34' rx='4' fill='#E7157B'/><text x='707' y='533' font-size='10.5' font-weight='700' fill='#fff' text-anchor='middle'>SNS</text><text x='732' y='526' font-size='13.5' font-weight='700' fill='#16191f'>Amazon SNS</text>
+<text x='732' y='543' font-size='11.5' fill='#5f6b7a'>topic order-events</text>
+</g>
+<g><rect x='430' y='500' width='200' height='70' rx='6' fill='#fff' stroke='#232F3E' stroke-width='1.6'/><rect x='440' y='512' width='34' height='34' rx='4' fill='#232F3E'/><text x='457' y='533' font-size='10.5' font-weight='700' fill='#fff' text-anchor='middle'>@</text><text x='482' y='526' font-size='13.5' font-weight='700' fill='#16191f'>Email subscribers</text>
+<text x='482' y='543' font-size='11.5' fill='#5f6b7a'>order confirmed / shipped</text>
+</g>
+<g><rect x='680' y='660' width='200' height='70' rx='6' fill='#fff' stroke='#E7157B' stroke-width='1.6'/><rect x='690' y='672' width='34' height='34' rx='4' fill='#E7157B'/><text x='707' y='693' font-size='10.5' font-weight='700' fill='#fff' text-anchor='middle'>SQS</text><text x='732' y='686' font-size='13.5' font-weight='700' fill='#16191f'>Amazon SQS</text>
+<text x='732' y='703' font-size='11.5' fill='#5f6b7a'>order-processing</text>
+</g>
+<g><rect x='430' y='660' width='200' height='70' rx='6' fill='#fff' stroke='#E7157B' stroke-width='1.6'/><rect x='440' y='672' width='34' height='34' rx='4' fill='#E7157B'/><text x='457' y='693' font-size='10.5' font-weight='700' fill='#fff' text-anchor='middle'>DLQ</text><text x='482' y='686' font-size='13.5' font-weight='700' fill='#16191f'>Dead-letter queue</text>
+<text x='482' y='703' font-size='11.5' fill='#5f6b7a'>after 3 failed attempts</text>
+</g>
+<g><rect x='930' y='660' width='200' height='70' rx='6' fill='#fff' stroke='#ED7100' stroke-width='1.6'/><rect x='940' y='672' width='34' height='34' rx='4' fill='#ED7100'/><text x='957' y='693' font-size='10.5' font-weight='700' fill='#fff' text-anchor='middle'>λ</text><text x='982' y='686' font-size='13.5' font-weight='700' fill='#16191f'>Lambda processor</text>
+<text x='982' y='703' font-size='11.5' fill='#5f6b7a'>order_processor</text>
+<text x='982' y='718' font-size='11.5' fill='#5f6b7a'>packing → shipping</text>
+</g>
+<g><rect x='1160' y='340' width='195' height='70' rx='6' fill='#fff' stroke='#ED7100' stroke-width='1.6'/><rect x='1170' y='352' width='34' height='34' rx='4' fill='#ED7100'/><text x='1187' y='373' font-size='10.5' font-weight='700' fill='#fff' text-anchor='middle'>λ</text><text x='1212' y='366' font-size='13.5' font-weight='700' fill='#16191f'>Lambda audit</text>
+<text x='1212' y='383' font-size='11.5' fill='#5f6b7a'>audit_stream</text>
+<text x='1212' y='398' font-size='11.5' fill='#5f6b7a'>stream consumer</text>
+</g>
+<g><rect x='1160' y='500' width='195' height='70' rx='6' fill='#fff' stroke='#7AA116' stroke-width='1.6'/><rect x='1170' y='512' width='34' height='34' rx='4' fill='#7AA116'/><text x='1187' y='533' font-size='10.5' font-weight='700' fill='#fff' text-anchor='middle'>S3</text><text x='1212' y='526' font-size='13.5' font-weight='700' fill='#16191f'>S3 audit bucket</text>
+<text x='1212' y='543' font-size='11.5' fill='#5f6b7a'>1 JSON doc per change</text>
+<text x='1212' y='558' font-size='11.5' fill='#5f6b7a'>versioned · 90 d lifecycle</text>
+</g>
+<g opacity='0.55'><rect x='1160' y='660' width='195' height='70' rx='6' fill='#fff' stroke='#7AA116' stroke-width='1.6' stroke-dasharray='6 4'/><rect x='1170' y='672' width='34' height='34' rx='4' fill='#7AA116'/><text x='1187' y='693' font-size='10.5' font-weight='700' fill='#fff' text-anchor='middle'>ATH</text><text x='1212' y='686' font-size='13.5' font-weight='700' fill='#16191f'>Amazon Athena</text>
+<text x='1212' y='703' font-size='11.5' fill='#5f6b7a'>SQL reporting (proposed)</text>
+</g>
+<g><rect x='1160' y='120' width='195' height='70' rx='6' fill='#fff' stroke='#E7157B' stroke-width='1.6'/><rect x='1170' y='132' width='34' height='34' rx='4' fill='#E7157B'/><text x='1187' y='153' font-size='10.5' font-weight='700' fill='#fff' text-anchor='middle'>CW</text><text x='1212' y='146' font-size='13.5' font-weight='700' fill='#16191f'>CloudWatch · X-Ray</text>
+<text x='1212' y='163' font-size='11.5' fill='#5f6b7a'>logs 7 d · 5 alarms</text>
+<text x='1212' y='178' font-size='11.5' fill='#5f6b7a'>dashboard · traces</text>
+</g>
+<g><rect x='1160' y='210' width='195' height='70' rx='6' fill='#fff' stroke='#DD344C' stroke-width='1.6'/><rect x='1170' y='222' width='34' height='34' rx='4' fill='#DD344C'/><text x='1187' y='243' font-size='10.5' font-weight='700' fill='#fff' text-anchor='middle'>IAM</text><text x='1212' y='236' font-size='13.5' font-weight='700' fill='#16191f'>IAM</text>
+<text x='1212' y='253' font-size='11.5' fill='#5f6b7a'>1 least-privilege role</text>
+<text x='1212' y='268' font-size='11.5' fill='#5f6b7a'>per Lambda function</text>
+</g>
+<text x='430' y='770' font-size='11' font-weight='400' fill='#5f6b7a' text-anchor='start'>Account baseline: AWS Budgets (1 USD alert) · CloudTrail → S3 · encryption with AWS managed / owned keys</text>
+<path d='M150,378 L178,378' fill='none' stroke='#414d5c' stroke-width='1.6' marker-end='url(#a)'/>
+<path d='M280,330 L280,175 L430,175' fill='none' stroke='#414d5c' stroke-width='1.6' marker-end='url(#a)'/>
+<path d='M383,375 L430,375' fill='none' stroke='#414d5c' stroke-width='1.6' marker-end='url(#a)'/>
+<path d='M630,375 L680,375' fill='none' stroke='#414d5c' stroke-width='1.6' marker-end='url(#a)'/>
+<path d='M880,360 L905,360 L905,235 L930,235' fill='none' stroke='#414d5c' stroke-width='1.6' marker-end='url(#a)'/>
+<path d='M880,390 L930,390' fill='none' stroke='#414d5c' stroke-width='1.6' marker-end='url(#a)'/>
+<path d='M780,410 L780,500' fill='none' stroke='#414d5c' stroke-width='1.6' marker-end='url(#a)'/>
+<path d='M680,535 L630,535' fill='none' stroke='#414d5c' stroke-width='1.6' marker-end='url(#a)'/>
+<path d='M780,570 L780,660' fill='none' stroke='#414d5c' stroke-width='1.6' marker-end='url(#a)'/>
+<path d='M680,695 L630,695' fill='none' stroke='#414d5c' stroke-width='1.6' marker-end='url(#a)'/>
+<path d='M880,695 L930,695' fill='none' stroke='#414d5c' stroke-width='1.6' marker-end='url(#a)'/>
+<path d='M1050,660 L1050,410' fill='none' stroke='#414d5c' stroke-width='1.6' marker-end='url(#a)'/>
+<path d='M960,660 L960,545 L880,545' fill='none' stroke='#414d5c' stroke-width='1.6' marker-end='url(#a)'/>
+<path d='M1130,375 L1160,375' fill='none' stroke='#414d5c' stroke-width='1.6' marker-end='url(#a)'/>
+<path d='M1257,410 L1257,500' fill='none' stroke='#414d5c' stroke-width='1.6' marker-end='url(#a)'/>
+<path d='M1257,570 L1257,660' fill='none' stroke='#8d99a8' stroke-width='1.6' stroke-dasharray='6 4' marker-end='url(#ad)'/>
+<line x1='30' y1='807' x2='1370' y2='807' stroke='#e9ebed'/>
+<text x='56' y='829' font-size='12' font-weight='400' fill='#414d5c' text-anchor='start'>Browse &amp; order via CloudFront</text>
+<text x='277.4' y='829' font-size='12' font-weight='400' fill='#414d5c' text-anchor='start'>Store order + publish event</text>
+<text x='485.59999999999997' y='829' font-size='12' font-weight='400' fill='#414d5c' text-anchor='start'>Email confirmation</text>
+<text x='634.4' y='829' font-size='12' font-weight='400' fill='#414d5c' text-anchor='start'>Lambda packs &amp; ships</text>
+<text x='796.4' y='829' font-size='12' font-weight='400' fill='#414d5c' text-anchor='start'>Audit stream to S3</text>
+<path d='M1070,825 L1110,825' stroke='#414d5c' stroke-width='1.6' marker-end='url(#a)'/>
+<text x='1118' y='829' font-size='12' font-weight='400' fill='#414d5c' text-anchor='start'>request / event</text>
+<path d='M1230,825 L1270,825' stroke='#8d99a8' stroke-width='1.6' stroke-dasharray='6 4' marker-end='url(#ad)'/>
+<text x='1278' y='829' font-size='12' font-weight='400' fill='#414d5c' text-anchor='start'>config / optional</text>
+<rect x='269.56' y='166' width='120.88000000000001' height='17' rx='3' fill='#fff' stroke='#d5dbe1'/><text x='330' y='179' font-size='11' fill='#414d5c' text-anchor='middle'>/ (static, cached)</text>
+<rect x='383.52' y='351' width='46.96' height='17' rx='3' fill='#fff' stroke='#d5dbe1'/><text x='407' y='364' font-size='11' fill='#414d5c' text-anchor='middle'>/api/*</text>
+<rect x='863.04' y='291' width='83.92' height='17' rx='3' fill='#fff' stroke='#d5dbe1'/><text x='905' y='304' font-size='11' fill='#414d5c' text-anchor='middle'>read catalog</text>
+<rect x='872.28' y='395' width='65.44' height='17' rx='3' fill='#fff' stroke='#d5dbe1'/><text x='905' y='408' font-size='11' fill='#414d5c' text-anchor='middle'>put order</text>
+<rect x='713.4' y='446' width='133.20000000000002' height='17' rx='3' fill='#fff' stroke='#d5dbe1'/><text x='780' y='459' font-size='11' fill='#414d5c' text-anchor='middle'>publish ORDER_PLACED</text>
+<rect x='713.4' y='606' width='133.20000000000002' height='17' rx='3' fill='#fff' stroke='#d5dbe1'/><text x='780' y='619' font-size='11' fill='#414d5c' text-anchor='middle'>filter: ORDER_PLACED</text>
+<rect x='878.44' y='672' width='53.120000000000005' height='17' rx='3' fill='#fff' stroke='#d5dbe1'/><text x='905' y='685' font-size='11' fill='#414d5c' text-anchor='middle'>trigger</text>
+<rect x='971.08' y='461' width='157.84' height='17' rx='3' fill='#fff' stroke='#d5dbe1'/><text x='1050' y='474' font-size='11' fill='#414d5c' text-anchor='middle'>status PACKING → SHIPPED</text>
+<rect x='914.96' y='591' width='90.08000000000001' height='17' rx='3' fill='#fff' stroke='#d5dbe1'/><text x='960' y='604' font-size='11' fill='#414d5c' text-anchor='middle'>ORDER_SHIPPED</text>
+<rect x='1121.52' y='352' width='46.96' height='17' rx='3' fill='#fff' stroke='#d5dbe1'/><text x='1145' y='365' font-size='11' fill='#414d5c' text-anchor='middle'>stream</text>
+<circle cx='164' cy='360' r='10' fill='#232F3E'/><text x='164' y='364' font-size='11' font-weight='700' fill='#fff' text-anchor='middle'>1</text>
+<circle cx='793' cy='425' r='10' fill='#232F3E'/><text x='793' y='429' font-size='11' font-weight='700' fill='#fff' text-anchor='middle'>2</text>
+<circle cx='655' cy='520' r='10' fill='#232F3E'/><text x='655' y='524' font-size='11' font-weight='700' fill='#fff' text-anchor='middle'>3</text>
+<circle cx='918' cy='722' r='10' fill='#232F3E'/><text x='918' y='726' font-size='11' font-weight='700' fill='#fff' text-anchor='middle'>4</text>
+<circle cx='1270' cy='425' r='10' fill='#232F3E'/><text x='1270' y='429' font-size='11' font-weight='700' fill='#fff' text-anchor='middle'>5</text>
+<circle cx='40' cy='825' r='10' fill='#232F3E'/><text x='40' y='829' font-size='11' font-weight='700' fill='#fff' text-anchor='middle'>1</text>
+<circle cx='261.4' cy='825' r='10' fill='#232F3E'/><text x='261.4' y='829' font-size='11' font-weight='700' fill='#fff' text-anchor='middle'>2</text>
+<circle cx='469.59999999999997' cy='825' r='10' fill='#232F3E'/><text x='469.59999999999997' y='829' font-size='11' font-weight='700' fill='#fff' text-anchor='middle'>3</text>
+<circle cx='618.4' cy='825' r='10' fill='#232F3E'/><text x='618.4' y='829' font-size='11' font-weight='700' fill='#fff' text-anchor='middle'>4</text>
+<circle cx='780.4' cy='825' r='10' fill='#232F3E'/><text x='780.4' y='829' font-size='11' font-weight='700' fill='#fff' text-anchor='middle'>5</text>
+</svg>
