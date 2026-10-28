@@ -3,7 +3,7 @@ locals {
 }
 
 # Provisioned capacity within the always-free 25 RCU / 25 WCU
-# (products 5 + orders 5 + by_month index 5 = 15).
+# (products 5 + orders 5 + by_month 5 + by_customer 5 = 20).
 resource "aws_dynamodb_table" "products" {
   name           = "${var.project}-products"
   billing_mode   = "PROVISIONED"
@@ -71,11 +71,27 @@ resource "aws_dynamodb_table" "orders" {
     type = "S"
   }
 
+  attribute {
+    name = "customer_id"
+    type = "S"
+  }
+
   # Back office: orders of a month, newest first (order list + sales dashboard)
   # with a Query instead of a full-table Scan.
   global_secondary_index {
     name            = "by_month"
     hash_key        = "month"
+    range_key       = "created_at"
+    projection_type = "ALL"
+    read_capacity   = var.dynamodb_capacity
+    write_capacity  = var.dynamodb_capacity
+  }
+
+  # Storefront: "my orders" of a signed-in customer (Cognito sub), newest first.
+  # Guest orders have no customer_id and are not indexed.
+  global_secondary_index {
+    name            = "by_customer"
+    hash_key        = "customer_id"
     range_key       = "created_at"
     projection_type = "ALL"
     read_capacity   = var.dynamodb_capacity

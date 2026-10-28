@@ -14,6 +14,10 @@ function mockApi() {
   const catalog = JSON.parse(readFileSync(resolve(root, "data", "catalog.json"), "utf8"));
   const orders = new Map();
   const STEPS = ["ORDERED", "PACKED", "SHIPPED"]; // moved by the back office in the real stack
+  const STEP_MS = 12000; // long enough to try cancelling an ORDERED order
+  const statusOf = (o) => (o.cancelled ? "CANCELLED" : STEPS[Math.min(2, Math.floor((Date.now() - o.placed) / STEP_MS))]);
+  const view = (o) => ({ ...o, status: statusOf(o) });
+  const customerOf = (req) => (req.headers.authorization ?? "").match(/^Bearer dev:(.+)$/)?.[1]; // dev sign-in token
   const send = (res, status, body) => {
     res.statusCode = status;
     res.setHeader("Content-Type", "application/json");
@@ -41,8 +45,23 @@ function mockApi() {
         if (req.method === "GET" && url.startsWith("/orders/")) {
           const order = orders.get(url.slice("/orders/".length));
           if (!order) return send(res, 404, { error: "order not found" });
-          const status = STEPS[Math.min(2, Math.floor((Date.now() - order.placed) / 4000))];
-          return send(res, 200, { ...order, status });
+          return send(res, 200, view(order));
+        }
+        if (url.startsWith("/me/")) {
+          const customer = customerOf(req);
+          if (!customer) return send(res, 401, { error: "sign in required" });
+          if (req.method === "GET" && url === "/me/orders") {
+            const mine = [...orders.values()].filter((o) => o.customer_id === customer).reverse();
+            return send(res, 200, mine.map(view));
+          }
+          const cancel = url.match(/^\/me\/orders\/([^/]+)\/cancel$/);
+          const order = cancel && orders.get(cancel[1]);
+          if (req.method === "POST" && order?.customer_id === customer) {
+            if (statusOf(order) !== "ORDERED") return send(res, 409, { error: `order ${order.order_id} cannot move to CANCELLED` });
+            order.cancelled = true;
+            return send(res, 200, view(order));
+          }
+          return send(res, 404, { error: "order not found" });
         }
         if (req.method === "POST" && url === "/orders") {
           let raw = "";
@@ -55,7 +74,8 @@ function mockApi() {
             }
             const total = items.reduce((sum, i) => sum + catalog.find((p) => p.id === i.product_id).price * i.quantity, 0);
             const order_id = randomUUID();
-            orders.set(order_id, { order_id, items, total, placed: Date.now() });
+            const lines = items.map((i) => ({ ...i, name: catalog.find((p) => p.id === i.product_id).name }));
+            orders.set(order_id, { order_id, items: lines, total, placed: Date.now(), created_at: new Date().toISOString(), customer_id: customerOf(req) });
             send(res, 201, {
               order_id,
               status: "ORDERED",
@@ -71,12 +91,26 @@ function mockApi() {
   };
 }
 
+// Sign-in settings: the mock and the local backend (`npm run dev` in backend/) accept
+// "dev" tokens; a deployed stack serves its own Cognito config.json through the proxy.
+const devConfig = {
+  name: "dev-config",
+  configureServer(server) {
+    server.middlewares.use("/config.json", (req, res, next) => {
+      if (backend && !/localhost|127\.0\.0\.1/.test(backend)) return next();
+      res.setHeader("Content-Type", "application/json");
+      res.end(JSON.stringify({ auth: "dev" }));
+    });
+  },
+};
+
 export default defineConfig({
-  plugins: backend ? [] : [mockApi()],
+  plugins: backend ? [devConfig] : [devConfig, mockApi()],
   server: backend
     ? {
         proxy: {
           "/api": { target: backend, changeOrigin: true },
+          "/config.json": { target: backend, changeOrigin: true },
           "/images": { target: backend, changeOrigin: true },
         },
       }

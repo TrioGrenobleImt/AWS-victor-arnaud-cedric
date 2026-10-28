@@ -1,7 +1,18 @@
+import { expire, token } from "./auth.js";
+
 // Every call goes to the relative /api path: CloudFront -> ALB -> ECS (Express).
+// The customer's access token is sent when signed in.
 export async function api(path, options = {}) {
-  const res = await fetch("/api" + path, { headers: { "Content-Type": "application/json" }, ...options });
+  const bearer = token();
+  const res = await fetch("/api" + path, {
+    ...options,
+    headers: { "Content-Type": "application/json", ...(bearer && { Authorization: `Bearer ${bearer}` }) },
+  });
   const body = await res.json().catch(() => ({}));
+  if (res.status === 401 && bearer) {
+    expire(); // revoked or expired: carry on as a guest
+    throw new Error("Your session expired, please sign in again.");
+  }
   if (!res.ok) throw new Error(body.error || res.statusText);
   return body;
 }

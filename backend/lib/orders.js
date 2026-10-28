@@ -46,7 +46,7 @@ function validateOrder({ customer_name, customer_email, items }) {
 }
 
 /** Stores the order and takes the items out of stock in one transaction. */
-export async function createOrder(body, source) {
+export async function createOrder(body, source, customerId) {
   const quantities = validateOrder(body);
   const productsTable = env("PRODUCTS_TABLE");
   const { Responses } = await ddb.send(
@@ -69,6 +69,7 @@ export async function createOrder(body, source) {
     month: monthOf(timestamp),
     customer_name: body.customer_name,
     customer_email: body.customer_email,
+    ...(customerId && { customer_id: customerId }), // signed-in customers: lists "my orders" (by_customer index)
     items: lines,
     total,
     status: "ORDERED",
@@ -141,8 +142,7 @@ export async function listOrders(month, status) {
   return items;
 }
 
-function transitionUpdate(orderId, status, detail, source, extra = {}) {
-  const from = TRANSITIONS[status];
+function transitionUpdate(orderId, status, detail, source, extra = {}, from = TRANSITIONS[status]) {
   if (!from) throw new ValidationError(`status must be one of ${Object.keys(TRANSITIONS).join(", ")}`);
   const timestamp = now();
   const fromValues = Object.fromEntries(from.map((s, i) => [`:from${i}`, s]));
@@ -180,15 +180,39 @@ export async function setStatus(orderId, status, detail, source, extra) {
   }
 }
 
-/** Cancels an order and puts its items back in stock, atomically. */
-export async function cancelOrder(orderId, detail, source) {
+/** Orders of one signed-in customer (by_customer index), newest first. */
+export async function listCustomerOrders(customerId) {
+  const items = [];
+  let ExclusiveStartKey;
+  do {
+    const page = await ddb.send(
+      new QueryCommand({
+        TableName: env("ORDERS_TABLE"),
+        IndexName: "by_customer",
+        KeyConditionExpression: "customer_id = :c",
+        ExpressionAttributeValues: { ":c": customerId },
+        ScanIndexForward: false,
+        ExclusiveStartKey,
+      }),
+    );
+    items.push(...page.Items);
+    ExclusiveStartKey = page.LastEvaluatedKey;
+  } while (ExclusiveStartKey);
+  return items;
+}
+
+/**
+ * Cancels an order and puts its items back in stock, atomically. `from` limits
+ * the statuses it can be cancelled from (customers: ORDERED only, the shop: until shipped).
+ */
+export async function cancelOrder(orderId, detail, source, from) {
   const order = await getOrder(orderId);
   if (!order) throw new InvalidTransitionError(`order ${orderId} cannot move to CANCELLED`);
   try {
     await ddb.send(
       new TransactWriteCommand({
         TransactItems: [
-          { Update: transitionUpdate(orderId, "CANCELLED", detail, source) },
+          { Update: transitionUpdate(orderId, "CANCELLED", detail, source, {}, from) },
           ...order.items.map((l) => ({
             Update: {
               TableName: env("PRODUCTS_TABLE"),

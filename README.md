@@ -16,7 +16,7 @@ Tier, combining **containers on EC2 (ECS)** for the request/response API and
 | **ECS on EC2** (Express, Node.js) | Admin API: products, stock, image uploads, orders, sales dashboard, team accounts | Separate service + IAM role, same cluster and ALB (path rule) |
 | **Lambda** (Node.js) | Packing slips (SQS), customer emails via SES (SQS), audit trail (DynamoDB Stream) | Triggered by events, bursty, no idle cost |
 | **S3 + CloudFront** | Storefront and back office (Vite), product images, packing slips | Static content at the edge, single HTTPS entry point |
-| **Cognito** | Back-office sign-in (hosted login, `admins` / `owners` groups) | Managed users/passwords, free Lite tier |
+| **Cognito** | Two user pools (free Lite tier): back-office sign-in (hosted login, `admins` / `owners` groups) and customer sign-in/up for the storefront | Managed users/passwords, kept apart so a customer can never reach the admin API |
 | **DynamoDB** | Products and orders (+ stream, `by_month` index) | Serverless, always-free 25 RCU/WCU |
 
 Both APIs and the Lambdas use the same code for the order domain
@@ -78,7 +78,15 @@ Storefront API:
 | GET    | `/api/products`     | Catalog                                   |
 | POST   | `/api/orders`       | Place an order (one or more products)     |
 | GET    | `/api/orders/{id}`  | Order status + full history (audit)       |
+| GET    | `/api/me/orders`    | My orders, newest first (customer token)  |
+| POST   | `/api/me/orders/{id}/cancel` | Cancel my order while it is still `ORDERED` (restocks; `409` once packed) |
 | GET    | `/images/{key}`     | Product image (CloudFront → images S3 bucket) |
+
+Customers sign in or up from the storefront (Cognito hosted login, optional:
+guests can still order). `POST /api/orders` with a customer token
+(`Authorization: Bearer <access token>`) attaches the order to the account
+(`customer_id`, `by_customer` index); `/api/me/*` requires the token and only
+ever returns or touches the caller's own orders.
 
 Back-office API (`Authorization: Bearer <Cognito access token>`, `admins` group):
 

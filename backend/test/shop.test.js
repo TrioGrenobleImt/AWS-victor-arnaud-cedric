@@ -11,7 +11,12 @@ import { getProduct } from "../lib/products.js";
 import { json, orderEvent, sent, serve, useTables } from "./helpers.js";
 
 useTables();
-const base = serve(createApp({ instance: () => ({ instance: "task-1", az: "eu-west-3a" }) }));
+const verify = async (token) => {
+  if (!token.startsWith("user-")) throw new Error("invalid token");
+  return { sub: token };
+};
+const base = serve(createApp({ instance: () => ({ instance: "task-1", az: "eu-west-3a" }), verify }));
+const as = (user) => ({ Authorization: `Bearer ${user}` });
 const api = (path, init) => fetch(`${base.url}/api${path}`, init);
 
 const validOrder = {
@@ -135,4 +140,45 @@ test("customer notifier escapes HTML, ignores other events and reports send fail
   assert.equal(sent.ses.length, 1);
   assert.match(sent.ses[0].Content.Simple.Body.Html.Data, /&lt;b&gt;Eve&lt;\/b&gt;/);
   assert.deepEqual(await notifyCustomers({ Records: [{ messageId: "c", body: "not json" }] }), { batchItemFailures: [{ itemIdentifier: "c" }] });
+});
+
+test("a signed-in customer sees only their own orders, newest first", async () => {
+  const place = async (user, body = validOrder) => (await api("/orders", json("POST", body, user && as(user)))).json();
+  const first = await place("user-a");
+  await place("user-b");
+  await place(undefined); // guest order: not attached to any account
+  const second = await place("user-a", { ...validOrder, items: [{ product_id: "p-001", quantity: 1 }] });
+
+  const mine = await (await api("/me/orders", { headers: as("user-a") })).json();
+  assert.deepEqual(mine.map((o) => o.order_id), [second.order_id, first.order_id]);
+  assert.equal((await (await api("/me/orders", { headers: as("user-c") })).json()).length, 0);
+});
+
+test("/me needs a valid customer token", async () => {
+  assert.equal((await api("/me/orders")).status, 401);
+  assert.equal((await api("/me/orders", { headers: as("nope") })).status, 401);
+  assert.equal((await api("/orders", json("POST", validOrder, as("nope")))).status, 401);
+});
+
+test("a customer cancels their order while ORDERED: restocked and announced", async () => {
+  const { order_id } = await (await api("/orders", json("POST", validOrder, as("user-a")))).json();
+  sent.sns.length = 0;
+  const res = await api(`/me/orders/${order_id}/cancel`, json("POST", undefined, as("user-a")));
+  assert.equal(res.status, 200);
+  const order = await res.json();
+  assert.equal(order.status, "CANCELLED");
+  assert.equal(order.history.at(-1).detail, "cancelled by the customer");
+  assert.equal((await getProduct("p-001")).stock, 40);
+  assert.equal(sent.sns[0].MessageAttributes.event_type.StringValue, "ORDER_CANCELLED");
+});
+
+test("a customer can't cancel a packed order, nor someone else's", async () => {
+  const { order_id } = await (await api("/orders", json("POST", validOrder, as("user-a")))).json();
+  assert.equal((await api(`/me/orders/${order_id}/cancel`, json("POST", undefined, as("user-b")))).status, 404);
+
+  await setStatus(order_id, "PACKED", "packed", "test");
+  const res = await api(`/me/orders/${order_id}/cancel`, json("POST", undefined, as("user-a")));
+  assert.equal(res.status, 409);
+  assert.equal((await getOrder(order_id)).status, "PACKED");
+  assert.equal((await getProduct("p-001")).stock, 38);
 });

@@ -103,6 +103,20 @@ resource "aws_s3_object" "backoffice_config" {
   })
 }
 
+# Runtime settings of the storefront (customer sign-in through the Cognito hosted login).
+resource "aws_s3_object" "web_config" {
+  bucket        = aws_s3_bucket.web.id
+  key           = "config.json"
+  content_type  = "application/json"
+  cache_control = "no-cache"
+  content = jsonencode({
+    auth        = "cognito"
+    domain      = "${aws_cognito_user_pool_domain.customers.domain}.auth.${var.region}.amazoncognito.com"
+    clientId    = aws_cognito_user_pool_client.storefront.id
+    redirectUri = local.storefront_url
+  })
+}
+
 # --- Product images (private bucket, served by CloudFront under /images/*) --
 resource "aws_s3_bucket" "images" {
   bucket        = "${var.project}-images-${data.aws_caller_identity.current.account_id}"

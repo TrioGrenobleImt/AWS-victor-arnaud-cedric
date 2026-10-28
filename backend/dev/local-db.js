@@ -60,12 +60,22 @@ export async function createTables(client, { products, orders }) {
         { AttributeName: "order_id", AttributeType: "S" },
         { AttributeName: "month", AttributeType: "S" },
         { AttributeName: "created_at", AttributeType: "S" },
+        { AttributeName: "customer_id", AttributeType: "S" },
       ],
       GlobalSecondaryIndexes: [
         {
           IndexName: "by_month",
           KeySchema: [
             { AttributeName: "month", KeyType: "HASH" },
+            { AttributeName: "created_at", KeyType: "RANGE" },
+          ],
+          Projection: { ProjectionType: "ALL" },
+          ProvisionedThroughput: throughput,
+        },
+        {
+          IndexName: "by_customer",
+          KeySchema: [
+            { AttributeName: "customer_id", KeyType: "HASH" },
             { AttributeName: "created_at", KeyType: "RANGE" },
           ],
           Projection: { ProjectionType: "ALL" },

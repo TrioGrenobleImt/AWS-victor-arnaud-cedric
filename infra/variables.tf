@@ -85,7 +85,7 @@ variable "api_max_count" {
 
 # --- Data + logs --------------------------------------------------------------
 variable "dynamodb_capacity" {
-  description = "Provisioned RCU/WCU per table. The always-free tier covers 25 RCU + 25 WCU in total (2 tables x 5 = 10)."
+  description = "Provisioned RCU/WCU per table. The always-free tier covers 25 RCU + 25 WCU in total (2 tables + 2 indexes x 5 = 20)."
   type        = number
   default     = 5
 }

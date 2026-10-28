@@ -100,7 +100,12 @@ const directory = memoryDirectory([
   { username: "dev-admin", email: "dev-admin@example.com", role: "owner" },
   { email: "packer@example.com", role: "staff" },
 ]);
-const shop = createApp({ instance: () => ({ instance: "dev", az: "local" }) });
+// Local customers: the token "dev:<email>" signs <email> in (the storefront's dev sign-in form).
+const verifyCustomer = async (token) => {
+  if (!token?.startsWith("dev:")) throw new Error("invalid token");
+  return { sub: token.slice(4) };
+};
+const shop = createApp({ instance: () => ({ instance: "dev", az: "local" }), verify: verifyCustomer });
 const admin = createAdminApp({ verify, directory });
 const app = express();
 app.get("/images/*key", async (req, res) => {

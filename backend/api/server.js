@@ -1,4 +1,5 @@
 import { createApp } from "./app.js";
+import { cognitoCustomerVerifier } from "./auth.js";
 
 const PORT = Number(process.env.PORT ?? 8080);
 
@@ -12,7 +13,10 @@ if (process.env.ECS_CONTAINER_METADATA_URI_V4) {
     .catch((err) => console.error("task metadata unavailable", err));
 }
 
-const server = createApp({ instance: () => identity }).listen(PORT, () => console.log(`shop-api listening on ${PORT}`));
+const server = createApp({
+  instance: () => identity,
+  verify: cognitoCustomerVerifier({ userPoolId: process.env.USER_POOL_ID, clientId: process.env.USER_POOL_CLIENT_ID }),
+}).listen(PORT, () => console.log(`shop-api listening on ${PORT}`));
 
 // ECS sends SIGTERM on deployments / scale-in: finish in-flight requests first.
 process.on("SIGTERM", () => server.close(() => process.exit(0)));

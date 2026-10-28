@@ -108,3 +108,61 @@ resource "aws_cognito_user_in_group" "owner" {
   group_name   = aws_cognito_user_group.owners.name
   username     = aws_cognito_user.admin[0].username
 }
+
+# --- Storefront sign-in: customers' own user pool ------------------------------
+# Separate from the back-office pool so a customer account can never reach the
+# admin API. Anyone can sign up (email + password, confirmed with a code Cognito
+# emails); ordering still works without an account. The storefront uses the same
+# hosted login + PKCE flow, and the shop API verifies the access tokens.
+resource "aws_cognito_user_pool" "customers" {
+  name                     = "${var.project}-customers"
+  user_pool_tier           = "LITE"
+  username_attributes      = ["email"]
+  auto_verified_attributes = ["email"]
+  deletion_protection      = "INACTIVE"
+
+  password_policy {
+    minimum_length    = 10
+    require_lowercase = true
+    require_uppercase = true
+    require_numbers   = true
+    require_symbols   = false
+  }
+
+  account_recovery_setting {
+    recovery_mechanism {
+      name     = "verified_email"
+      priority = 1
+    }
+  }
+}
+
+resource "aws_cognito_user_pool_domain" "customers" {
+  domain                = "${var.project}-shop-${data.aws_caller_identity.current.account_id}"
+  user_pool_id          = aws_cognito_user_pool.customers.id
+  managed_login_version = 1
+}
+
+resource "aws_cognito_user_pool_client" "storefront" {
+  name         = "storefront"
+  user_pool_id = aws_cognito_user_pool.customers.id
+
+  generate_secret                      = false # public SPA client, protected by PKCE
+  allowed_oauth_flows_user_pool_client = true
+  allowed_oauth_flows                  = ["code"]
+  allowed_oauth_scopes                 = ["openid", "email", "profile"]
+  supported_identity_providers         = ["COGNITO"]
+  callback_urls                        = [local.storefront_url]
+  logout_urls                          = [local.storefront_url]
+
+  explicit_auth_flows           = ["ALLOW_REFRESH_TOKEN_AUTH"]
+  prevent_user_existence_errors = "ENABLED"
+  access_token_validity         = 60
+  id_token_validity             = 60
+  refresh_token_validity        = 1
+  token_validity_units {
+    access_token  = "minutes"
+    id_token      = "minutes"
+    refresh_token = "days"
+  }
+}

@@ -1,5 +1,6 @@
 import "./style.css";
 import { api, imageUrl } from "./api.js";
+import * as auth from "./auth.js";
 
 const STEPS = [
   { status: "ORDERED", label: "Order placed" },
@@ -10,7 +11,15 @@ const MAX_QTY = 10;
 const POLL_MS = 5000; // the shop packs and ships by hand (back office): check every 5 s for 10 min
 const POLL_TIMES = 120;
 
-const state = { products: [], cart: {}, genre: "All", query: "" };
+const CART_KEY = "fisa-shop-cart"; // survives the round trip to the hosted sign-in page
+const loadCart = () => {
+  try {
+    return JSON.parse(sessionStorage.getItem(CART_KEY)) ?? {};
+  } catch {
+    return {};
+  }
+};
+const state = { products: [], cart: loadCart(), genre: "All", query: "", user: null };
 const $ = (id) => document.getElementById(id);
 
 const escapeHtml = (value) =>
@@ -69,8 +78,15 @@ function card(p) {
 function setQty(id, qty) {
   state.cart[id] = Math.max(0, Math.min(maxQty(productById(id)), qty));
   if (!state.cart[id]) delete state.cart[id];
+  saveCart();
   renderCart();
   renderCatalog();
+}
+
+function saveCart() {
+  try {
+    sessionStorage.setItem(CART_KEY, JSON.stringify(state.cart));
+  } catch {} // private mode: the crate just won't survive a sign-in redirect
 }
 
 function renderCart() {
@@ -103,6 +119,13 @@ function renderCart() {
   $("total").textContent = euros(total);
   $("crateCount").textContent = count;
   $("placeOrder").disabled = !lines.length;
+}
+
+const VIEWS = { cart: "cartView", track: "trackView", orders: "ordersView" };
+const TITLES = { cart: "Your crate", track: "Your crate", orders: "My orders" };
+function showView(view) {
+  for (const [name, id] of Object.entries(VIEWS)) $(id).hidden = name !== view;
+  $("drawerTitle").textContent = TITLES[view];
 }
 
 function openCrate(open) {
@@ -151,19 +174,111 @@ async function placeOrder(event) {
       }),
     });
     state.cart = {};
+    saveCart();
     await loadProducts(); // stock changed
     $("confirmMsg").textContent = res.message;
-    $("cartView").hidden = true;
-    $("trackView").hidden = false;
+    showView("track");
     renderStatus(res);
     poll(res.order_id).catch((e) => ($("confirmMsg").textContent += ` (tracking stopped: ${e.message})`));
   } catch (e) {
     $("checkoutError").textContent = "Order failed: " + e.message;
     $("checkoutError").hidden = false;
-    loadProducts().catch(() => {}); // e.g. sold out meanwhile: show the current stock
+    auth
+  .init()
+  .then((session) => {
+    state.user = session;
+  })
+  .catch((e) => console.warn(e.message))
+  .finally(renderAccount);
+
+loadProducts().catch(() => {}); // e.g. sold out meanwhile: show the current stock
   } finally {
     button.disabled = !Object.keys(state.cart).length;
   }
+}
+
+// --- Account + my orders --------------------------------------------------------
+function renderAccount() {
+  const user = state.user;
+  const button = $("account");
+  button.hidden = !auth.enabled();
+  button.textContent = user ? "My orders" : "Sign in";
+  let menu = $("signOut");
+  if (user && !menu) {
+    menu = document.createElement("button");
+    menu.id = "signOut";
+    menu.type = "button";
+    menu.className = "account-btn";
+    menu.textContent = "Sign out";
+    menu.title = user.email;
+    menu.addEventListener("click", auth.signOut);
+    button.after(menu);
+  }
+  if (!user && menu) menu.remove();
+
+  $("guestHint").hidden = !!user || !auth.enabled();
+  $("email").readOnly = !!user; // order emails go to the account's address
+  if (user) {
+    $("email").value = user.email;
+    if ($("name").value === "Demo Customer") $("name").value = user.email.split("@")[0];
+  }
+}
+
+async function signIn(page) {
+  state.user = await auth.signIn(page);
+  renderAccount();
+  if (state.user) showOrders();
+}
+
+function orderCard(o) {
+  const date = new Date(o.created_at).toLocaleString();
+  const lines = o.items.map((i) => `<li>${escapeHtml(i.quantity)} × ${escapeHtml(i.name)}</li>`).join("");
+  const action =
+    o.status === "ORDERED"
+      ? `<button type="button" class="cancel-btn" data-cancel="${escapeHtml(o.order_id)}">Cancel order</button>`
+      : o.status === "PACKED"
+        ? `<span class="muted">Already packed, it can no longer be cancelled.</span>`
+        : o.status === "SHIPPED" && o.tracking_number
+          ? `<span class="muted">Tracking number: ${escapeHtml(o.tracking_number)}</span>`
+          : "";
+  return `
+    <article class="order">
+      <div class="order-head"><strong>#${escapeHtml(o.order_id.slice(0, 8))}</strong><span class="status ${escapeHtml(o.status)}">${escapeHtml(o.status.toLowerCase())}</span></div>
+      <span class="muted">${escapeHtml(date)} · ${euros(o.total)}</span>
+      <ul>${lines}</ul>
+      ${action}
+    </article>`;
+}
+
+async function showOrders() {
+  showView("orders");
+  openCrate(true);
+  $("ordersError").hidden = true;
+  try {
+    const orders = await api("/me/orders");
+    $("orders").innerHTML = orders.length ? orders.map(orderCard).join("") : `<p class="muted empty">No orders yet. Go dig!</p>`;
+  } catch (e) {
+    $("ordersError").textContent = e.message;
+    $("ordersError").hidden = false;
+    if (!auth.token()) {
+      state.user = null;
+      renderAccount();
+    }
+  }
+}
+
+async function cancelOrder(orderId) {
+  if (!confirm("Cancel this order? The records go back in stock.")) return;
+  $("ordersError").hidden = true;
+  try {
+    await api(`/me/orders/${orderId}/cancel`, { method: "POST" });
+    await loadProducts(); // stock is back
+  } catch (e) {
+    $("ordersError").textContent = /cannot move/.test(e.message) ? "Too late: the shop already packed this order." : e.message;
+    $("ordersError").hidden = false;
+  }
+  const orders = await api("/me/orders").catch(() => null);
+  if (orders) $("orders").innerHTML = orders.map(orderCard).join("");
 }
 
 // --- Wiring -------------------------------------------------------------------
@@ -193,9 +308,18 @@ $("closeCrate").addEventListener("click", () => openCrate(false));
 $("scrim").addEventListener("click", () => openCrate(false));
 document.addEventListener("keydown", (e) => e.key === "Escape" && openCrate(false));
 $("checkout").addEventListener("submit", placeOrder);
+$("account").addEventListener("click", () => (state.user ? showOrders() : signIn("login")));
+$("hintSignIn").addEventListener("click", (e) => {
+  e.preventDefault();
+  signIn("login");
+});
+$("orders").addEventListener("click", (e) => {
+  const id = e.target.closest("[data-cancel]")?.dataset.cancel;
+  if (id) cancelOrder(id);
+});
+$("backToCrate").addEventListener("click", () => showView("cart"));
 $("keepShopping").addEventListener("click", () => {
-  $("trackView").hidden = true;
-  $("cartView").hidden = false;
+  showView("cart");
   openCrate(false);
 });
 
@@ -214,5 +338,13 @@ async function loadProducts() {
   renderCatalog();
   renderCart();
 }
+
+auth
+  .init()
+  .then((session) => {
+    state.user = session;
+  })
+  .catch((e) => console.warn(e.message))
+  .finally(renderAccount);
 
 loadProducts().catch((e) => ($("catalog").innerHTML = `<p class="error">Could not load the catalog: ${escapeHtml(e.message)}</p>`));

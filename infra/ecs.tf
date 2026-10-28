@@ -175,8 +175,11 @@ locals {
     shop-api = {
       command       = ["node", "api/server.js"]
       desired_count = var.api_desired_count
-      environment   = local.common_env
-      policy        = data.aws_iam_policy_document.shop_task.json
+      environment = merge(local.common_env, {
+        USER_POOL_ID        = aws_cognito_user_pool.customers.id
+        USER_POOL_CLIENT_ID = aws_cognito_user_pool_client.storefront.id
+      })
+      policy = data.aws_iam_policy_document.shop_task.json
     }
     admin-api = {
       command       = ["node", "admin/server.js"]
@@ -223,9 +226,14 @@ data "aws_iam_policy_document" "shop_task" {
     resources = [aws_dynamodb_table.products.arn]
   }
   statement {
-    sid       = "PlaceAndTrackOrders"
-    actions   = ["dynamodb:PutItem", "dynamodb:GetItem"]
+    sid       = "PlaceAndTrackOrders" # UpdateItem: customers cancel their own orders (restocking uses the products statement)
+    actions   = ["dynamodb:PutItem", "dynamodb:GetItem", "dynamodb:UpdateItem"]
     resources = [aws_dynamodb_table.orders.arn]
+  }
+  statement {
+    sid       = "ListMyOrders"
+    actions   = ["dynamodb:Query"]
+    resources = ["${aws_dynamodb_table.orders.arn}/index/by_customer"]
   }
   statement {
     actions   = ["sns:Publish"]
