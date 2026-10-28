@@ -34,7 +34,7 @@ Both APIs and the Lambdas use the same code for the order domain
 ```
 .
 ├── frontend/                 # Vite storefront (calls /api/*, loads /images/*)
-├── backoffice/               # Vite back office, served under /admin/ (calls /admin/api/*)
+├── backoffice/               # Vite back office, own CloudFront address (calls /admin/api/*)
 ├── images/                   # Product images uploaded to the images S3 bucket
 │   ├── covers/               #   album covers (one per product)
 │   └── generate_covers.py    #   regenerates the placeholder SVG covers
@@ -57,7 +57,20 @@ Both APIs and the Lambdas use the same code for the order domain
 └── docs/                     # Diagrams of the previous two-solution design (kept for comparison)
 ```
 
-## API
+## Addresses and API
+
+Each app has its own CloudFront address (both free, printed by Terraform):
+
+| Output | App | Routes |
+|---|---|---|
+| `base_url` (`https://d111….cloudfront.net`) | Storefront | `/` site, `/images/*`, `/api/*` → shop API |
+| `backoffice_url` (`https://d222….cloudfront.net`) | Back office | `/` site, `/images/*`, `/admin/api/*` → admin API |
+
+The admin API is only routed through the back-office address. Own subdomains
+(`shop.` / `admin.`) would need a domain name + ACM certificates (see the
+alternatives at the end).
+
+Storefront API:
 
 | Method | Path                | Purpose                                   |
 |--------|---------------------|-------------------------------------------|
@@ -84,12 +97,14 @@ Back-office API (`Authorization: Bearer <Cognito access token>`, `admins` group)
 
 ```mermaid
 flowchart LR
-    U((Customers)) -->|HTTPS| CF[CloudFront]
-    A((Admins)) -->|HTTPS /admin/| CF
+    U((Customers)) -->|HTTPS| CF[CloudFront<br/>storefront]
+    A((Admins)) -->|HTTPS| CFA[CloudFront<br/>back office]
     A -->|hosted login| COG[Cognito user pool<br/>admins group]
-    CF -->|/ and /admin/* OAC| S3W[(S3 website<br/>shop + back office)]
-    CF -->|/images/* OAC| S3I[(S3 images)]
-    CF -->|/api/* and /admin/api/*| ALB[ALB<br/>CloudFront prefix list only]
+    CF -->|/ OAC| S3W[(S3 website)]
+    CFA -->|/ OAC| S3B[(S3 back office)]
+    CF & CFA -->|/images/* OAC| S3I[(S3 images)]
+    CF -->|/api/*| ALB[ALB<br/>CloudFront prefix list only]
+    CFA -->|/admin/api/*| ALB
     subgraph VPC 10.10.0.0/16 — 2 AZs, public subnets
       ALB -->|default| T1[ECS shop-api ×2]
       ALB -->|/admin/api/*| T2[ECS admin-api]
@@ -205,7 +220,7 @@ cd backend && npm ci
 npm test       # shop API, admin API and Lambdas against DynamoDB Local (Docker)
 npm run dev    # both APIs on :8080 + DynamoDB Local + S3 stand-in, seeded from data/catalog.json
 
-cd backoffice && npm ci && npm run dev                                # http://localhost:5174/admin/ (local sign-in)
+cd backoffice && npm ci && npm run dev                                # http://localhost:5174/ (local sign-in)
 cd frontend && SHOP_BACKEND=http://localhost:8080 npm run dev         # storefront on the local backend
 cd frontend && npm run dev                                            # or with its built-in mock API
 ```
@@ -249,7 +264,7 @@ CloudWatch dashboard: `terraform -chdir=infra output dashboard_url`.
 | Lambda | 2 functions, arm64 128 MB | 1 M requests + 400 000 GB-s/month (always free) |
 | DynamoDB | 2 tables + 1 index × 5 RCU/WCU, Streams | 25 RCU/WCU + 25 GB + 2.5 M stream reads (always free) |
 | Cognito | Lite tier, hosted login | 10 000 monthly active users free |
-| CloudFront | 1 distribution, 1 CloudFront Function | 1 TB + 10 M requests + 2 M function invocations/month (always free) |
+| CloudFront | 2 distributions (storefront, back office) | 1 TB + 10 M requests/month across all distributions (always free) |
 | S3 | website, images, documents, audit, trail | 5 GB (12 months) |
 | SNS / SQS | | 1 M publishes / 1 M requests (always free) |
 | CloudWatch | 6 alarms, 1 dashboard, logs 7 days | 10 alarms + 3 dashboards + 5 GB logs |
@@ -272,7 +287,7 @@ terraform -chdir=infra destroy
 | Streaming | DynamoDB Streams → Lambda | Amazon MSK / MSK Serverless (Kafka) or Kinesis Data Streams → Firehose → S3 |
 | Private container instances | public subnets + SG (inbound from ALB only) | private subnets + NAT Gateway or VPC endpoints |
 | Database | DynamoDB provisioned 5 RCU/WCU | on-demand capacity, global tables, PITR backups |
-| Custom domain + TLS CloudFront → ALB | default DNS names, HTTP between CloudFront and ALB | Route 53 hosted zone + ACM certificates |
+| Custom domains + TLS CloudFront → ALB | one default `*.cloudfront.net` address per app, HTTP between CloudFront and ALB | domain + Route 53 hosted zone (~0.50 USD/month) + free ACM certificates: `shop.` / `admin.` subdomains |
 | Edge protection | ALB reachable from CloudFront only | AWS WAF on CloudFront, Shield Advanced |
 | Customer emails | SNS topic subscription | Amazon SES transactional emails per customer |
 | Order workflow | admin actions + packing-slip Lambda | Step Functions (packing → shipping → invoicing) |

@@ -2,7 +2,7 @@ locals {
   # Vite build output: run `npm ci && npm run build` in frontend/ before apply.
   frontend_dir   = "${path.module}/../frontend/dist"
   frontend_files = fileset(local.frontend_dir, "**")
-  # Back office build, served under /admin/ from the same bucket.
+  # Back office build, served by its own bucket + distribution.
   backoffice_dir   = "${path.module}/../backoffice/dist"
   backoffice_files = fileset(local.backoffice_dir, "**")
   image_dir        = "${path.module}/../images"
@@ -34,10 +34,6 @@ resource "aws_s3_bucket" "web" {
       condition     = contains(local.frontend_files, "index.html")
       error_message = "Frontend not built: run `npm ci && npm run build` in frontend/ first."
     }
-    precondition {
-      condition     = contains(local.backoffice_files, "index.html")
-      error_message = "Back office not built: run `npm ci && npm run build` in backoffice/ first."
-    }
   }
 }
 
@@ -62,10 +58,31 @@ resource "aws_s3_object" "web" {
 }
 
 
+# --- Back office site (private bucket, served only by its CloudFront) --------
+resource "aws_s3_bucket" "backoffice" {
+  bucket        = "${var.project}-backoffice-${data.aws_caller_identity.current.account_id}"
+  force_destroy = true
+
+  lifecycle {
+    precondition {
+      condition     = contains(local.backoffice_files, "index.html")
+      error_message = "Back office not built: run `npm ci && npm run build` in backoffice/ first."
+    }
+  }
+}
+
+resource "aws_s3_bucket_public_access_block" "backoffice" {
+  bucket                  = aws_s3_bucket.backoffice.id
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
 resource "aws_s3_object" "backoffice" {
   for_each      = local.backoffice_files
-  bucket        = aws_s3_bucket.web.id
-  key           = "admin/${each.value}"
+  bucket        = aws_s3_bucket.backoffice.id
+  key           = each.value
   source        = "${local.backoffice_dir}/${each.value}"
   etag          = filemd5("${local.backoffice_dir}/${each.value}")
   content_type  = lookup(local.content_types, lower(regex("[^.]+$", each.value)), "application/octet-stream")
@@ -74,8 +91,8 @@ resource "aws_s3_object" "backoffice" {
 
 # Runtime settings of the back office (Cognito hosted login).
 resource "aws_s3_object" "backoffice_config" {
-  bucket        = aws_s3_bucket.web.id
-  key           = "admin/config.json"
+  bucket        = aws_s3_bucket.backoffice.id
+  key           = "config.json"
   content_type  = "application/json"
   cache_control = "no-cache"
   content = jsonencode({
@@ -101,13 +118,13 @@ resource "aws_s3_bucket_public_access_block" "images" {
 }
 
 # The back office uploads covers straight from the browser (presigned POST,
-# images/uploads/*), so the bucket accepts cross-origin POSTs from the site.
+# images/uploads/*), so the bucket accepts cross-origin POSTs from its address.
 resource "aws_s3_bucket_cors_configuration" "images" {
   bucket = aws_s3_bucket.images.id
 
   cors_rule {
     allowed_methods = ["POST"]
-    allowed_origins = ["https://${aws_cloudfront_distribution.main.domain_name}"]
+    allowed_origins = ["https://${aws_cloudfront_distribution.backoffice.domain_name}"]
     allowed_headers = ["*"]
     max_age_seconds = 3600
   }
@@ -123,13 +140,22 @@ resource "aws_s3_object" "images" {
   cache_control = "public, max-age=86400"
 }
 
-# Both buckets are readable only by this CloudFront distribution (OAC).
+# Each site bucket is readable only by its own distribution, the images bucket
+# by both (Origin Access Control).
+locals {
+  bucket_readers = {
+    web        = { bucket = aws_s3_bucket.web, distributions = [aws_cloudfront_distribution.main.arn] }
+    backoffice = { bucket = aws_s3_bucket.backoffice, distributions = [aws_cloudfront_distribution.backoffice.arn] }
+    images     = { bucket = aws_s3_bucket.images, distributions = [aws_cloudfront_distribution.main.arn, aws_cloudfront_distribution.backoffice.arn] }
+  }
+}
+
 data "aws_iam_policy_document" "cloudfront_read" {
-  for_each = { web = aws_s3_bucket.web.arn, images = aws_s3_bucket.images.arn }
+  for_each = local.bucket_readers
 
   statement {
     actions   = ["s3:GetObject"]
-    resources = ["${each.value}/*"]
+    resources = ["${each.value.bucket.arn}/*"]
     principals {
       type        = "Service"
       identifiers = ["cloudfront.amazonaws.com"]
@@ -137,21 +163,17 @@ data "aws_iam_policy_document" "cloudfront_read" {
     condition {
       test     = "StringEquals"
       variable = "AWS:SourceArn"
-      values   = [aws_cloudfront_distribution.main.arn]
+      values   = each.value.distributions
     }
   }
 }
 
-resource "aws_s3_bucket_policy" "web" {
-  bucket     = aws_s3_bucket.web.id
-  policy     = data.aws_iam_policy_document.cloudfront_read["web"].json
-  depends_on = [aws_s3_bucket_public_access_block.web]
-}
+resource "aws_s3_bucket_policy" "cloudfront_read" {
+  for_each = local.bucket_readers
+  bucket   = each.value.bucket.id
+  policy   = data.aws_iam_policy_document.cloudfront_read[each.key].json
 
-resource "aws_s3_bucket_policy" "images" {
-  bucket     = aws_s3_bucket.images.id
-  policy     = data.aws_iam_policy_document.cloudfront_read["images"].json
-  depends_on = [aws_s3_bucket_public_access_block.images]
+  depends_on = [aws_s3_bucket_public_access_block.web, aws_s3_bucket_public_access_block.backoffice, aws_s3_bucket_public_access_block.images]
 }
 
 # --- Internal documents: packing slips (written by the order-processor Lambda,

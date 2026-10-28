@@ -3,9 +3,7 @@
 # "admins" group; there is no self sign-up. The SPA uses the Cognito hosted
 # login page (authorization code + PKCE) and the admin API verifies the access
 # tokens (signature, expiry, client id, group).
-locals {
-  backoffice_url = "https://${aws_cloudfront_distribution.main.domain_name}/admin/"
-}
+# backoffice_url (the back office's own CloudFront address) is defined in cdn.tf.
 
 resource "aws_cognito_user_pool" "admin" {
   name                = "${var.project}-admin"

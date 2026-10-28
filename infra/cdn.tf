@@ -1,11 +1,16 @@
-# CloudFront is the single entry point: storefront, back office (/admin/) and
-# product images from S3, /api/* and /admin/api/* proxied to the ALB (ECS), so
-# the browser talks to one origin (no CORS) over HTTPS. The ALB only accepts
-# CloudFront traffic (managed prefix list).
+# Two CloudFront distributions, one per app, each with its own *.cloudfront.net
+# address (free: the CloudFront free tier covers all distributions together):
+#   storefront  : shop site + /images/* (S3) and /api/* (ALB -> shop-api)
+#   back office : admin site + /images/* (S3) and /admin/api/* (ALB -> admin-api)
+# Each app talks to a single origin (no CORS for its API) over HTTPS; the
+# admin API is not reachable through the storefront address. The ALB only
+# accepts CloudFront traffic (managed prefix list).
 locals {
   cache_policy_optimized         = "658327ea-f89d-4fab-a63d-7e88639e58f6" # Managed-CachingOptimized
   cache_policy_disabled          = "4135ea2d-6df8-44a3-9df3-4b5a84be39ad" # Managed-CachingDisabled
   origin_request_all_except_host = "b689b0a8-53d0-40ab-baf2-68738e2966ac" # Managed-AllViewerExceptHostHeader
+
+  backoffice_url = "https://${aws_cloudfront_distribution.backoffice.domain_name}/"
 }
 
 resource "aws_cloudfront_origin_access_control" "web" {
@@ -39,24 +44,7 @@ resource "aws_cloudfront_cache_policy" "admin_api" {
   }
 }
 
-# S3 has no directory index: /admin and /admin/ (and the SPA's routes) serve
-# admin/index.html. CloudFront Functions: 2M invocations/month always free.
-resource "aws_cloudfront_function" "admin_index" {
-  name    = "${var.project}-admin-index"
-  runtime = "cloudfront-js-2.0"
-  comment = "Serve the back office index.html"
-  publish = true
-  code    = <<-EOT
-    function handler(event) {
-      var request = event.request;
-      if (request.uri === "/admin" || request.uri === "/admin/" || request.uri.indexOf(".") === -1) {
-        request.uri = "/admin/index.html";
-      }
-      return request;
-    }
-  EOT
-}
-
+# --- Storefront -------------------------------------------------------------
 resource "aws_cloudfront_distribution" "main" {
   enabled             = true
   comment             = "${var.project} storefront"
@@ -109,37 +97,84 @@ resource "aws_cloudfront_distribution" "main" {
   }
 
   ordered_cache_behavior {
-    path_pattern             = "/admin/api/*"
-    target_origin_id         = "api"
-    viewer_protocol_policy   = "https-only"
-    allowed_methods          = ["DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"]
-    cached_methods           = ["GET", "HEAD"]
-    cache_policy_id          = aws_cloudfront_cache_policy.admin_api.id
-    origin_request_policy_id = local.origin_request_all_except_host
-  }
-
-  ordered_cache_behavior {
-    path_pattern           = "/admin*"
-    target_origin_id       = "web"
-    viewer_protocol_policy = "redirect-to-https"
-    allowed_methods        = ["GET", "HEAD"]
-    cached_methods         = ["GET", "HEAD"]
-    cache_policy_id        = local.cache_policy_optimized
-    compress               = true
-
-    function_association {
-      event_type   = "viewer-request"
-      function_arn = aws_cloudfront_function.admin_index.arn
-    }
-  }
-
-  ordered_cache_behavior {
     path_pattern             = "/api/*"
     target_origin_id         = "api"
     viewer_protocol_policy   = "https-only"
     allowed_methods          = ["DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"]
     cached_methods           = ["GET", "HEAD"]
     cache_policy_id          = local.cache_policy_disabled
+    origin_request_policy_id = local.origin_request_all_except_host
+  }
+
+  restrictions {
+    geo_restriction {
+      restriction_type = "none"
+    }
+  }
+
+  viewer_certificate {
+    cloudfront_default_certificate = true
+  }
+}
+
+# --- Back office ------------------------------------------------------------
+# The SPA uses hash routes (#/orders), so "/" -> index.html is all it needs.
+resource "aws_cloudfront_distribution" "backoffice" {
+  enabled             = true
+  comment             = "${var.project} back office"
+  default_root_object = "index.html"
+  price_class         = "PriceClass_100"
+
+  origin {
+    origin_id                = "backoffice"
+    domain_name              = aws_s3_bucket.backoffice.bucket_regional_domain_name
+    origin_access_control_id = aws_cloudfront_origin_access_control.web.id
+  }
+
+  origin {
+    origin_id                = "images"
+    domain_name              = aws_s3_bucket.images.bucket_regional_domain_name
+    origin_access_control_id = aws_cloudfront_origin_access_control.web.id
+  }
+
+  origin {
+    origin_id   = "api"
+    domain_name = aws_lb.api.dns_name
+
+    custom_origin_config {
+      http_port              = 80
+      https_port             = 443
+      origin_protocol_policy = "http-only"
+      origin_ssl_protocols   = ["TLSv1.2"]
+    }
+  }
+
+  default_cache_behavior {
+    target_origin_id       = "backoffice"
+    viewer_protocol_policy = "redirect-to-https"
+    allowed_methods        = ["GET", "HEAD"]
+    cached_methods         = ["GET", "HEAD"]
+    cache_policy_id        = local.cache_policy_optimized
+    compress               = true
+  }
+
+  ordered_cache_behavior {
+    path_pattern           = "/images/*"
+    target_origin_id       = "images"
+    viewer_protocol_policy = "redirect-to-https"
+    allowed_methods        = ["GET", "HEAD"]
+    cached_methods         = ["GET", "HEAD"]
+    cache_policy_id        = local.cache_policy_optimized
+    compress               = true
+  }
+
+  ordered_cache_behavior {
+    path_pattern             = "/admin/api/*"
+    target_origin_id         = "api"
+    viewer_protocol_policy   = "https-only"
+    allowed_methods          = ["DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"]
+    cached_methods           = ["GET", "HEAD"]
+    cache_policy_id          = aws_cloudfront_cache_policy.admin_api.id
     origin_request_policy_id = local.origin_request_all_except_host
   }
 

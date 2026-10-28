@@ -13,9 +13,11 @@ cd "$(dirname "$0")/.."
 
 tf() { terraform -chdir=infra output -raw "$1"; }
 BASE_URL="${BASE_URL:-$(tf base_url)}"
+ADMIN_URL="${ADMIN_URL:-$(tf backoffice_url)}"
+ADMIN_URL="${ADMIN_URL%/}"
 AUDIT_BUCKET=$(tf audit_bucket)
 DOCUMENTS_BUCKET=$(tf documents_bucket)
-echo "Target: $BASE_URL"
+echo "Storefront: $BASE_URL   Back office: $ADMIN_URL"
 
 echo -e "\n== 1. Load balancing (6 calls) =="
 for _ in $(seq 6); do curl -sf "$BASE_URL/api/health" | jq -c '{instance, az}'; done
@@ -49,10 +51,10 @@ if [ -n "${ADMIN_EMAIL:-}" ] && [ -n "${ADMIN_PASSWORD:-}" ]; then
   TOKEN=$(aws cognito-idp admin-initiate-auth --user-pool-id "$(tf user_pool_id)" --client-id "$(tf user_pool_client_id)" \
     --auth-flow ADMIN_USER_PASSWORD_AUTH --auth-parameters "USERNAME=$ADMIN_EMAIL,PASSWORD=$ADMIN_PASSWORD" \
     --query AuthenticationResult.AccessToken --output text)
-  admin() { curl -sf -X POST "$BASE_URL/admin/api/orders/$ORDER_ID/status" -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d "$1"; }
+  admin() { curl -sf -X POST "$ADMIN_URL/admin/api/orders/$ORDER_ID/status" -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d "$1"; }
   admin '{"status": "PACKED"}' | jq -c '{status}'
   admin '{"status": "SHIPPED", "tracking_number": "TEST-123"}' | jq -c '{status, tracking_number}'
-  curl -sf "$BASE_URL/admin/api/dashboard" -H "Authorization: Bearer $TOKEN" | jq -c '{month, revenue, orders, by_status}'
+  curl -sf "$ADMIN_URL/admin/api/dashboard" -H "Authorization: Bearer $TOKEN" | jq -c '{month, revenue, orders, by_status}'
   STATUS=$(curl -sf "$BASE_URL/api/orders/$ORDER_ID" | jq -r .status)
 else
   echo "(skipped: set ADMIN_EMAIL and ADMIN_PASSWORD to drive the admin API)"
@@ -65,8 +67,9 @@ aws s3 ls "s3://$AUDIT_BUCKET/orders/" --recursive | grep "$ORDER_ID" || echo "(
 
 echo -e "\n== 7. Validation and access control =="
 curl -s -o /dev/null -w 'bad order:          HTTP %{http_code}\n' -X POST "$BASE_URL/api/orders" -H 'Content-Type: application/json' -d '{"items": []}'
-curl -s -o /dev/null -w 'anonymous admin:    HTTP %{http_code}\n' "$BASE_URL/admin/api/orders"
-curl -s -o /dev/null -w 'back office page:   HTTP %{http_code}\n' "$BASE_URL/admin/"
+curl -s -o /dev/null -w 'anonymous admin:    HTTP %{http_code}\n' "$ADMIN_URL/admin/api/orders"
+curl -s -o /dev/null -w 'admin via the shop: HTTP %{http_code} (not routed)\n' "$BASE_URL/admin/api/orders"
+curl -s -o /dev/null -w 'back office page:   HTTP %{http_code}\n' "$ADMIN_URL/"
 
 EXPECTED=$([ -n "${ADMIN_PASSWORD:-}" ] && echo SHIPPED || echo ORDERED)
 [ -n "$SLIP" ] && [ "$STATUS" = "$EXPECTED" ] && echo -e "\nPASS" || { echo -e "\nFAIL: status $STATUS (expected $EXPECTED), packing slip ${SLIP:-missing}"; exit 1; }

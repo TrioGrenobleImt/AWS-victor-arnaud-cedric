@@ -60,7 +60,7 @@ async function exchange(code, state) {
 
 /** Returns a valid session, finishing or starting the hosted login when needed. */
 export async function session() {
-  config ??= await (await fetch(`${import.meta.env.BASE_URL}config.json`, { cache: "no-store" })).json();
+  config ??= await (await fetch("/config.json", { cache: "no-store" })).json();
   if (config.auth === "dev") return { access_token: "dev", email: "dev-admin (local)" };
   const params = new URLSearchParams(location.search);
   if (params.has("code")) return exchange(params.get("code"), params.get("state"));
