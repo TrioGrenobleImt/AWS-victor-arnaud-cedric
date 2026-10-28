@@ -1,6 +1,6 @@
 # FISA Shop — AWS Project 2026
 
-Online shop where customers browse a catalog, place orders and get a real-time
+Online vinyl record shop ("FISA Records") where customers browse a catalog, place orders and get a real-time
 confirmation. Orders are recorded for audit and trigger internal processing
 (packing, shipping simulation). Two implementations of the same functional
 scope are provided, both fully automated with Terraform and sized for the AWS
@@ -10,8 +10,11 @@ Free Tier.
 .
 ├── docs/                      # Architecture diagrams (SVG + PNG, generate_diagrams.py)
 ├── shared/                    # Used by both solutions
-│   ├── catalog.json           #   product catalog (seed data)
-│   └── frontend/index.html    #   single-page storefront (calls /api/*)
+│   ├── catalog.json           #   product catalog (seed data, incl. image keys)
+│   ├── images/                #   product images uploaded to the images S3 bucket
+│   │   ├── covers/            #     album covers (one per product)
+│   │   └── generate_covers.py #     regenerates the placeholder SVG covers
+│   └── frontend/              #   Vite storefront (calls /api/*, loads /images/*)
 ├── 00-account-baseline/       # Budget alerts + CloudTrail (deploy once)
 ├── 01-solution-ec2/           # Solution 1: VMs (ALB + Auto Scaling + RDS)
 │   ├── app/                   #   Flask API + SQS worker (Python)
@@ -30,6 +33,22 @@ Both solutions expose the same API, so the same frontend and test scenarios work
 | GET    | `/api/products`     | Catalog                                   |
 | POST   | `/api/orders`       | Place an order (one or more products)     |
 | GET    | `/api/orders/{id}`  | Order status + full history (audit)       |
+| GET    | `/images/{key}`     | Product image from the images S3 bucket   |
+
+Product images are stored in a private S3 bucket (`images/covers/*`, key =
+the product's `image` field). Solution 2 serves them through a CloudFront
+`/images/*` behavior (OAC); solution 1 answers `/images/*` with a redirect to
+a short-lived presigned S3 URL.
+
+### Frontend (Vite)
+
+```bash
+cd shared/frontend
+npm ci
+npm run dev                                   # local mock API, no AWS needed
+SHOP_BACKEND=$(terraform -chdir=../../02-solution-serverless output -raw base_url) npm run dev   # against a deployed stack
+npm run build                                 # writes dist/, required before terraform apply
+```
 
 ## Event flow (common to both solutions)
 
@@ -137,12 +156,16 @@ flowchart LR
 ## Prerequisites
 
 * Terraform ≥ 1.6, AWS CLI v2, `jq`, `curl`
+* Node.js ≥ 20 (builds the Vite frontend)
 * AWS credentials with permission to create the resources (`aws sts get-caller-identity`)
 * Default region: `eu-west-3` (Paris) — override with `-var region=…`
 
 ## Deploy
 
 Each folder is an independent Terraform root module with its own local state.
+Both solutions upload the frontend from `shared/frontend/dist`, so build it
+first (`cd shared/frontend && npm ci && npm run build`); `terraform apply`
+stops with an explicit error if it is missing.
 Copy `terraform.tfvars.example` to `terraform.tfvars` in each folder and set
 your email to receive the notifications (optional for the solutions).
 

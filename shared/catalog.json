@@ -1,8 +1,10 @@
 [
-  {"id": "p-001", "name": "Mechanical keyboard", "description": "Tenkeyless keyboard with brown switches", "price": 79.90, "stock": 50},
-  {"id": "p-002", "name": "Wireless mouse", "description": "Ergonomic 2.4 GHz mouse, 6 buttons", "price": 34.50, "stock": 120},
-  {"id": "p-003", "name": "27\" monitor", "description": "QHD IPS panel, 144 Hz", "price": 289.00, "stock": 15},
-  {"id": "p-004", "name": "USB-C hub", "description": "7-in-1 hub with HDMI and Ethernet", "price": 45.00, "stock": 80},
-  {"id": "p-005", "name": "Noise-cancelling headset", "description": "Bluetooth headset, 30 h battery", "price": 149.99, "stock": 30},
-  {"id": "p-006", "name": "Webcam 1080p", "description": "Full HD webcam with dual microphone", "price": 59.00, "stock": 60}
+  {"id": "p-001", "name": "Midnight Static", "artist": "The Velvet Hours", "genre": "Indie Rock", "year": 2019, "description": "180 g black vinyl, gatefold sleeve with lyric insert", "price": 27.90, "stock": 40, "image": "images/covers/p-001.svg"},
+  {"id": "p-002", "name": "Saffron Skies", "artist": "Lena Okafor", "genre": "Soul", "year": 2021, "description": "Limited orange marble pressing, 2 LP", "price": 31.50, "stock": 25, "image": "images/covers/p-002.svg"},
+  {"id": "p-003", "name": "Blue Hour Sessions", "artist": "The Marlowe Quartet", "genre": "Jazz", "year": 1962, "description": "All-analog reissue cut from the original tapes", "price": 34.00, "stock": 15, "image": "images/covers/p-003.svg"},
+  {"id": "p-004", "name": "Neon Cathedral", "artist": "Kites Over Kyoto", "genre": "Synthwave", "year": 2023, "description": "Translucent magenta vinyl with poster", "price": 29.00, "stock": 60, "image": "images/covers/p-004.svg"},
+  {"id": "p-005", "name": "Dust & Diesel", "artist": "Hollis Creek", "genre": "Folk", "year": 2018, "description": "Standard black vinyl, recorded live in one take", "price": 24.90, "stock": 35, "image": "images/covers/p-005.svg"},
+  {"id": "p-006", "name": "Tidal Memory", "artist": "Aurora Vale", "genre": "Ambient", "year": 2020, "description": "Sea-glass clear vinyl, 45 RPM double LP", "price": 26.50, "stock": 30, "image": "images/covers/p-006.svg"},
+  {"id": "p-007", "name": "Concrete Bloom", "artist": "MC Tessellate", "genre": "Hip-Hop", "year": 2022, "description": "Black vinyl with instrumental side D", "price": 28.00, "stock": 50, "image": "images/covers/p-007.svg"},
+  {"id": "p-008", "name": "Low Light Funk", "artist": "Brass Alley Collective", "genre": "Funk", "year": 1976, "description": "Remastered 180 g reissue, obi strip", "price": 32.00, "stock": 20, "image": "images/covers/p-008.svg"}
 ]

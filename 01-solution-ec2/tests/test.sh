@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # End-to-end scenario for solution 1 (EC2). Run from 01-solution-ec2/ after `terraform apply`.
 #   1. load balancing  : /api/health answered by several instances / AZs
-#   2. catalog         : GET /api/products
+#   2. catalog         : GET /api/products + one product image (S3 via presigned redirect)
 #   3. order           : POST /api/orders -> immediate confirmation
 #   4. async processing: SNS -> SQS -> worker, status goes PENDING -> PACKING -> SHIPPED
 set -euo pipefail
@@ -15,6 +15,8 @@ for _ in $(seq 6); do curl -sf "$BASE_URL/api/health" | jq -c '{instance, az}'; 
 
 echo -e "\n== 2. Catalog =="
 curl -sf "$BASE_URL/api/products" | jq -c '.[] | {id, name, price}'
+IMAGE=$(curl -sf "$BASE_URL/api/products" | jq -r '.[0].image')
+echo "Image /$IMAGE (S3 images bucket): $(curl -sfL -o /dev/null -w '%{http_code} %{content_type}' "$BASE_URL/$IMAGE")"
 
 echo -e "\n== 3. Place an order =="
 ORDER=$(curl -sf -X POST "$BASE_URL/api/orders" -H 'Content-Type: application/json' -d '{

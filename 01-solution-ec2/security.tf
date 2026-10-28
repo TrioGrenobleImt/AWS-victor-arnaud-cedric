@@ -84,6 +84,12 @@ data "aws_iam_policy_document" "app" {
   }
 
   statement {
+    sid       = "ReadProductImages" # presigned URLs are signed with the instance role
+    actions   = ["s3:GetObject"]
+    resources = ["${aws_s3_bucket.images.arn}/images/*"]
+  }
+
+  statement {
     sid       = "ReadDbPassword"
     actions   = ["ssm:GetParameter"]
     resources = [aws_ssm_parameter.db_password.arn]

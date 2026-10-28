@@ -3,146 +3,74 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>FISA Shop</title>
-  <style>
-    :root { --bg:#f6f7f9; --card:#fff; --ink:#1d2330; --muted:#667085; --accent:#ff9900; --ok:#12b76a; }
-    * { box-sizing: border-box; }
-    body { margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background:var(--bg); color:var(--ink); }
-    header { background:#232f3e; color:#fff; padding:16px 24px; display:flex; justify-content:space-between; align-items:center; }
-    header small { color:#c7ced9; }
-    main { max-width:1100px; margin:24px auto; padding:0 16px; display:grid; grid-template-columns: 2fr 1fr; gap:24px; }
-    @media (max-width: 800px) { main { grid-template-columns: 1fr; } }
-    .grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap:16px; }
-    .card { background:var(--card); border-radius:10px; padding:16px; box-shadow:0 1px 3px rgba(0,0,0,.08); }
-    .price { font-weight:700; font-size:1.2em; }
-    .muted { color:var(--muted); font-size:.9em; }
-    input { width:100%; padding:8px; margin:4px 0 10px; border:1px solid #d0d5dd; border-radius:6px; }
-    input[type=number] { width:70px; }
-    button { background:var(--accent); border:0; padding:10px 14px; border-radius:6px; font-weight:600; cursor:pointer; }
-    button:disabled { opacity:.5; cursor:default; }
-    .row { display:flex; justify-content:space-between; align-items:center; gap:8px; }
-    .timeline span { display:inline-block; padding:4px 8px; border-radius:12px; background:#eaecf0; margin:2px; font-size:.85em; }
-    .timeline span.done { background:var(--ok); color:#fff; }
-    pre { white-space:pre-wrap; font-size:.8em; background:#f2f4f7; padding:8px; border-radius:6px; }
-  </style>
+  <title>FISA Records</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 </head>
 <body>
-<header>
-  <strong>FISA Shop</strong>
-  <small id="backend">backend: …</small>
-</header>
-<main>
-  <section>
-    <h2>Catalog</h2>
-    <div id="catalog" class="grid">Loading…</div>
-  </section>
-  <aside>
-    <div class="card">
-      <h2>Your order</h2>
-      <div id="cart" class="muted">Cart is empty.</div>
-      <p class="row"><strong>Total</strong><strong id="total">0.00 €</strong></p>
-      <label>Name<input id="name" value="Demo Customer"></label>
-      <label>Email<input id="email" type="email" value="demo@example.com"></label>
-      <button id="order" disabled>Place order</button>
+  <header class="topbar">
+    <a class="brand" href="/">
+      <span class="brand-disc" aria-hidden="true"></span>
+      <span>FISA <em>Records</em></span>
+    </a>
+    <input id="search" class="search" type="search" placeholder="Search artist, album, genre…" aria-label="Search the catalog">
+    <button id="openCrate" class="crate-btn" type="button">
+      Crate <span id="crateCount" class="badge">0</span>
+    </button>
+  </header>
+
+  <section class="hero">
+    <div>
+      <p class="eyebrow">Independent vinyl shop · since 2026</p>
+      <h1>Dig the crates.<br>Drop the needle.</h1>
+      <p class="lede">Hand-picked pressings, reissues and limited colour vinyl, shipped in sturdy mailers.</p>
     </div>
-    <div class="card" id="confirmation" style="margin-top:16px; display:none">
-      <h3>Confirmation</h3>
-      <p id="confirmMsg"></p>
-      <div class="timeline" id="timeline"></div>
-      <pre id="orderJson"></pre>
+    <div class="turntable" aria-hidden="true">
+      <div class="platter"><div class="record"><div class="label"></div></div></div>
+      <div class="tonearm"></div>
+    </div>
+  </section>
+
+  <main>
+    <nav id="genres" class="genres" aria-label="Filter by genre"></nav>
+    <div id="catalog" class="catalog" aria-live="polite"><p class="muted">Loading the crates…</p></div>
+  </main>
+
+  <footer class="footer">
+    <span id="backend">backend: …</span>
+  </footer>
+
+  <div id="scrim" class="scrim" hidden></div>
+  <aside id="crate" class="drawer" aria-label="Your crate" aria-hidden="true">
+    <div class="drawer-head">
+      <h2>Your crate</h2>
+      <button id="closeCrate" class="icon-btn" type="button" aria-label="Close">✕</button>
+    </div>
+
+    <div id="cartView">
+      <div id="cartLines" class="lines"></div>
+      <p class="total-row"><span>Total</span><strong id="total">0.00 €</strong></p>
+      <form id="checkout" class="checkout">
+        <label>Name<input id="name" required value="Demo Customer"></label>
+        <label>Email<input id="email" type="email" required value="demo@example.com"></label>
+        <p id="checkoutError" class="error" hidden></p>
+        <button id="placeOrder" class="primary" type="submit" disabled>Place order</button>
+      </form>
+    </div>
+
+    <div id="trackView" hidden>
+      <p id="confirmMsg" class="confirm"></p>
+      <ol id="timeline" class="timeline"></ol>
+      <details>
+        <summary>Order details (raw)</summary>
+        <pre id="orderJson"></pre>
+      </details>
+      <button id="keepShopping" class="secondary" type="button">Keep digging</button>
     </div>
   </aside>
-</main>
-<script>
-  // Same UI for both solutions: every call goes to the relative /api path
-  // (ALB -> EC2 in solution 1, CloudFront -> API Gateway -> Lambda in solution 2).
-  const cart = {};
-  let products = [];
-  const STEPS = ["PENDING", "PACKING", "SHIPPED"];
 
-  async function api(path, options) {
-    const res = await fetch("/api" + path, { headers: { "Content-Type": "application/json" }, ...options });
-    const body = await res.json();
-    if (!res.ok) throw new Error(body.error || res.statusText);
-    return body;
-  }
-
-  function renderCart() {
-    const lines = Object.entries(cart).filter(([, q]) => q > 0);
-    let total = 0;
-    document.getElementById("cart").innerHTML = lines.length ? lines.map(([id, q]) => {
-      const p = products.find(x => x.id === id);
-      total += p.price * q;
-      return `<div class="row"><span>${q} × ${p.name}</span><span>${(p.price * q).toFixed(2)} €</span></div>`;
-    }).join("") : "Cart is empty.";
-    document.getElementById("total").textContent = total.toFixed(2) + " €";
-    document.getElementById("order").disabled = !lines.length;
-  }
-
-  async function loadCatalog() {
-    products = await api("/products");
-    document.getElementById("catalog").innerHTML = products.map(p => `
-      <div class="card">
-        <h3>${p.name}</h3>
-        <p class="muted">${p.description}</p>
-        <div class="row">
-          <span class="price">${p.price.toFixed(2)} €</span>
-          <input type="number" min="0" max="10" value="0" data-id="${p.id}">
-        </div>
-        <p class="muted">${p.stock} in stock</p>
-      </div>`).join("");
-    document.querySelectorAll("#catalog input").forEach(i => i.addEventListener("input", e => {
-      cart[e.target.dataset.id] = Math.max(0, Math.min(10, parseInt(e.target.value || "0", 10)));
-      renderCart();
-    }));
-  }
-
-  async function loadBackend() {
-    try {
-      const h = await api("/health");
-      document.getElementById("backend").textContent = `backend: ${h.backend} · ${h.instance || ""} ${h.az || ""}`;
-    } catch (e) { document.getElementById("backend").textContent = "backend: unreachable"; }
-  }
-
-  function renderStatus(order) {
-    const idx = STEPS.indexOf(order.status);
-    document.getElementById("timeline").innerHTML =
-      STEPS.map((s, i) => `<span class="${i <= idx ? "done" : ""}">${s}</span>`).join("→");
-    document.getElementById("orderJson").textContent = JSON.stringify(order, null, 2);
-  }
-
-  async function poll(orderId) {
-    for (let i = 0; i < 30; i++) {
-      const order = await api("/orders/" + orderId);
-      renderStatus(order);
-      if (order.status === "SHIPPED") return;
-      await new Promise(r => setTimeout(r, 2000));
-    }
-  }
-
-  document.getElementById("order").addEventListener("click", async () => {
-    const btn = document.getElementById("order");
-    btn.disabled = true;
-    try {
-      const items = Object.entries(cart).filter(([, q]) => q > 0).map(([product_id, quantity]) => ({ product_id, quantity }));
-      const res = await api("/orders", { method: "POST", body: JSON.stringify({
-        customer_name: document.getElementById("name").value,
-        customer_email: document.getElementById("email").value,
-        items,
-      }) });
-      document.getElementById("confirmation").style.display = "block";
-      document.getElementById("confirmMsg").textContent = res.message;
-      renderStatus(res);
-      poll(res.order_id);
-    } catch (e) {
-      alert("Order failed: " + e.message);
-    } finally {
-      btn.disabled = false;
-    }
-  });
-
-  loadBackend();
-  loadCatalog().catch(e => document.getElementById("catalog").textContent = "Error: " + e.message);
-</script>
+  <script type="module" src="/src/main.js"></script>
 </body>
 </html>

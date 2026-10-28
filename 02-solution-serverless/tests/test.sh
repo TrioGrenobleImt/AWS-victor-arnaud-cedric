@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # End-to-end scenario for solution 2 (serverless). Run from 02-solution-serverless/ after `terraform apply`.
-#   1. health / catalog : CloudFront -> API Gateway -> Lambda -> DynamoDB
+#   1. health / catalog : CloudFront -> API Gateway -> Lambda -> DynamoDB, product image via CloudFront -> S3
 #   2. order            : POST /api/orders -> immediate confirmation + SNS event
 #   3. async processing : SNS -> SQS -> Lambda, status PENDING -> PACKING -> SHIPPED
 #   4. audit streaming  : DynamoDB Stream -> Lambda -> S3 audit documents
@@ -14,6 +14,8 @@ echo "Target: $BASE_URL"
 echo -e "\n== 1. Health + catalog =="
 curl -sf "$BASE_URL/api/health" | jq -c .
 curl -sf "$BASE_URL/api/products" | jq -c '.[] | {id, name, price}'
+IMAGE=$(curl -sf "$BASE_URL/api/products" | jq -r '.[0].image')
+echo "Image /$IMAGE (S3 images bucket): $(curl -sfL -o /dev/null -w '%{http_code} %{content_type}' "$BASE_URL/$IMAGE")"
 
 echo -e "\n== 2. Place an order =="
 ORDER=$(curl -sf -X POST "$BASE_URL/api/orders" -H 'Content-Type: application/json' -d '{

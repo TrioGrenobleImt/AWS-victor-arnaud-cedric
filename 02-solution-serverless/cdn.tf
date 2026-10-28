@@ -1,5 +1,5 @@
-# CloudFront serves the static site from S3 and proxies /api/* to API Gateway,
-# so the browser talks to a single origin (no CORS) over HTTPS.
+# CloudFront serves the static site and the product images from S3 and proxies
+# /api/* to API Gateway, so the browser talks to a single origin (no CORS) over HTTPS.
 locals {
   cache_policy_optimized         = "658327ea-f89d-4fab-a63d-7e88639e58f6" # Managed-CachingOptimized
   cache_policy_disabled          = "4135ea2d-6df8-44a3-9df3-4b5a84be39ad" # Managed-CachingDisabled
@@ -27,6 +27,12 @@ resource "aws_cloudfront_distribution" "main" {
   }
 
   origin {
+    origin_id                = "images"
+    domain_name              = aws_s3_bucket.images.bucket_regional_domain_name
+    origin_access_control_id = aws_cloudfront_origin_access_control.web.id
+  }
+
+  origin {
     origin_id   = "api"
     domain_name = local.api_domain
 
@@ -40,6 +46,16 @@ resource "aws_cloudfront_distribution" "main" {
 
   default_cache_behavior {
     target_origin_id       = "web"
+    viewer_protocol_policy = "redirect-to-https"
+    allowed_methods        = ["GET", "HEAD"]
+    cached_methods         = ["GET", "HEAD"]
+    cache_policy_id        = local.cache_policy_optimized
+    compress               = true
+  }
+
+  ordered_cache_behavior {
+    path_pattern           = "/images/*"
+    target_origin_id       = "images"
     viewer_protocol_policy = "redirect-to-https"
     allowed_methods        = ["GET", "HEAD"]
     cached_methods         = ["GET", "HEAD"]

@@ -8,6 +8,10 @@ output "api_endpoint" {
   value       = aws_apigatewayv2_api.http.api_endpoint
 }
 
+output "images_bucket" {
+  value = aws_s3_bucket.images.id
+}
+
 output "audit_bucket" {
   value = aws_s3_bucket.audit.id
 }

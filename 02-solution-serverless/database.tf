@@ -28,9 +28,13 @@ resource "aws_dynamodb_table_item" "products" {
   item = jsonencode({
     id          = { S = each.value.id }
     name        = { S = each.value.name }
+    artist      = { S = each.value.artist }
+    genre       = { S = each.value.genre }
+    year        = { N = tostring(each.value.year) }
     description = { S = each.value.description }
     price       = { N = tostring(each.value.price) }
     stock       = { N = tostring(each.value.stock) }
+    image       = { S = each.value.image } # key in the images bucket, served at /<image>
   })
 }
 

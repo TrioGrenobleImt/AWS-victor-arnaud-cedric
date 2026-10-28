@@ -12,13 +12,17 @@ from decimal import Decimal
 
 import boto3
 import pymysql
-from flask import Flask, jsonify, request, send_from_directory
+from botocore.config import Config
+from flask import Flask, jsonify, redirect, request, send_from_directory
 
 REGION = os.environ["AWS_REGION"]
 TOPIC_ARN = os.environ["TOPIC_ARN"]
 STATIC_DIR = os.environ.get("STATIC_DIR", "static")
+IMAGES_BUCKET = os.environ["IMAGES_BUCKET"]
 
 sns = boto3.client("sns", region_name=REGION)
+# Regional endpoint: the global one redirects for buckets outside us-east-1, breaking presigned URLs.
+s3 = boto3.client("s3", region_name=REGION, endpoint_url=f"https://s3.{REGION}.amazonaws.com", config=Config(signature_version="s3v4"))
 ssm = boto3.client("ssm", region_name=REGION)
 DB_PASSWORD = ssm.get_parameter(Name=os.environ["DB_PASSWORD_SSM"], WithDecryption=True)["Parameter"]["Value"]
 
@@ -28,7 +32,11 @@ SCHEMA = [
         name VARCHAR(255) NOT NULL,
         description VARCHAR(1024),
         price DECIMAL(10,2) NOT NULL,
-        stock INT NOT NULL)""",
+        stock INT NOT NULL,
+        artist VARCHAR(255),
+        genre VARCHAR(64),
+        year SMALLINT,
+        image VARCHAR(512))""",
     """CREATE TABLE IF NOT EXISTS orders (
         id CHAR(36) PRIMARY KEY,
         customer_name VARCHAR(255) NOT NULL,
@@ -53,6 +61,15 @@ SCHEMA = [
         INDEX (order_id))""",
 ]
 
+# Columns added after the first release: created on databases that predate them.
+PRODUCT_COLUMNS = {
+    "artist": "VARCHAR(255)",
+    "genre": "VARCHAR(64)",
+    "year": "SMALLINT",
+    "image": "VARCHAR(512)",
+}
+PRODUCT_FIELDS = ["id", "name", "description", "price", "stock", *PRODUCT_COLUMNS]
+
 
 def db():
     return pymysql.connect(
@@ -66,7 +83,11 @@ def db():
 
 
 def init_db():
-    """Create the schema and seed the catalog (idempotent, retried while RDS boots)."""
+    """Create the schema and sync the catalog (idempotent, retried while RDS boots).
+
+    catalog.json is the source of truth: products are upserted and products
+    removed from the file are deleted (order_items keeps its own unit_price).
+    """
     with open(os.environ["CATALOG_FILE"]) as f:
         catalog = json.load(f)
     for attempt in range(30):
@@ -80,11 +101,21 @@ def init_db():
     with conn, conn.cursor() as cur:
         for statement in SCHEMA:
             cur.execute(statement)
-        for p in catalog:
-            cur.execute(
-                "INSERT IGNORE INTO products (id, name, description, price, stock) VALUES (%s, %s, %s, %s, %s)",
-                (p["id"], p["name"], p["description"], p["price"], p["stock"]),
-            )
+        cur.execute(
+            "SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'products'"
+        )
+        existing = {r["COLUMN_NAME"] for r in cur.fetchall()}
+        for column, ddl in PRODUCT_COLUMNS.items():
+            if column not in existing:
+                cur.execute(f"ALTER TABLE products ADD COLUMN {column} {ddl}")
+        columns = ", ".join(PRODUCT_FIELDS)
+        placeholders = ", ".join(["%s"] * len(PRODUCT_FIELDS))
+        updates = ", ".join(f"{c} = VALUES({c})" for c in PRODUCT_FIELDS[1:])
+        cur.executemany(
+            f"INSERT INTO products ({columns}) VALUES ({placeholders}) ON DUPLICATE KEY UPDATE {updates}",
+            [tuple(p.get(f) for f in PRODUCT_FIELDS) for p in catalog],
+        )
+        cur.execute("DELETE FROM products WHERE id NOT IN %s", (tuple(p["id"] for p in catalog),))
         conn.commit()
 
 
@@ -98,7 +129,22 @@ app = Flask(__name__, static_folder=None)
 
 @app.get("/")
 def index():
-    return send_from_directory(STATIC_DIR, "index.html")
+    return send_from_directory(STATIC_DIR, "index.html", max_age=0)
+
+
+@app.get("/<path:filename>")
+def static_files(filename):
+    """Vite build output (hashed assets/*, favicon...). Unknown paths return 404."""
+    return send_from_directory(STATIC_DIR, filename, max_age=31536000 if filename.startswith("assets/") else 3600)
+
+
+@app.get("/images/<path:key>")
+def image(key):
+    """Product images stay in the private images bucket: redirect to a short-lived presigned URL."""
+    url = s3.generate_presigned_url(
+        "get_object", Params={"Bucket": IMAGES_BUCKET, "Key": f"images/{key}"}, ExpiresIn=3600
+    )
+    return redirect(url, code=302)
 
 
 @app.get("/api/health")

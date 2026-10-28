@@ -12,13 +12,19 @@ data "aws_ami" "al2023" {
 
 # --- Application artifacts (code + frontend + catalog) on S3 ----------------
 locals {
-  app_files = {
-    "app.py"           = "${path.module}/app/app.py"
-    "worker.py"        = "${path.module}/app/worker.py"
-    "requirements.txt" = "${path.module}/app/requirements.txt"
-    "catalog.json"     = "${path.module}/../shared/catalog.json"
-    "index.html"       = "${path.module}/../shared/frontend/index.html"
-  }
+  # Vite build output: run `npm ci && npm run build` in shared/frontend before apply.
+  frontend_dir   = "${path.module}/../shared/frontend/dist"
+  frontend_files = fileset(local.frontend_dir, "**")
+
+  app_files = merge(
+    {
+      "app.py"           = "${path.module}/app/app.py"
+      "worker.py"        = "${path.module}/app/worker.py"
+      "requirements.txt" = "${path.module}/app/requirements.txt"
+      "catalog.json"     = "${path.module}/../shared/catalog.json"
+    },
+    { for f in local.frontend_files : "static/${f}" => "${local.frontend_dir}/${f}" },
+  )
 
   # Any change to the code produces a new launch template version, which
   # triggers a rolling instance refresh of the Auto Scaling group.
@@ -28,6 +34,13 @@ locals {
 resource "aws_s3_bucket" "artifacts" {
   bucket        = "${var.project}-artifacts-${data.aws_caller_identity.current.account_id}"
   force_destroy = true
+
+  lifecycle {
+    precondition {
+      condition     = contains(local.frontend_files, "index.html")
+      error_message = "Frontend not built: run `npm ci && npm run build` in shared/frontend first."
+    }
+  }
 }
 
 resource "aws_s3_bucket_public_access_block" "artifacts" {
@@ -44,6 +57,38 @@ resource "aws_s3_object" "app" {
   key      = "releases/${local.app_version}/${each.key}"
   source   = each.value
   etag     = filemd5(each.value)
+}
+
+# --- Product images (private bucket, served through presigned URLs) ---------
+# The browser asks the app for /images/<key>; Flask answers with a redirect to
+# a short-lived presigned S3 URL, so the bucket never needs to be public.
+locals {
+  image_dir   = "${path.module}/../shared/images"
+  image_files = fileset(local.image_dir, "covers/**")
+  image_types = { svg = "image/svg+xml", png = "image/png", jpg = "image/jpeg", jpeg = "image/jpeg", webp = "image/webp" }
+}
+
+resource "aws_s3_bucket" "images" {
+  bucket        = "${var.project}-images-${data.aws_caller_identity.current.account_id}"
+  force_destroy = true
+}
+
+resource "aws_s3_bucket_public_access_block" "images" {
+  bucket                  = aws_s3_bucket.images.id
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+resource "aws_s3_object" "images" {
+  for_each      = local.image_files
+  bucket        = aws_s3_bucket.images.id
+  key           = "images/${each.value}" # = the "image" field of catalog.json
+  source        = "${local.image_dir}/${each.value}"
+  etag          = filemd5("${local.image_dir}/${each.value}")
+  content_type  = lookup(local.image_types, lower(regex("[^.]+$", each.value)), "application/octet-stream")
+  cache_control = "public, max-age=86400"
 }
 
 # --- Launch template + Auto Scaling group across 2 AZs ----------------------
@@ -75,6 +120,7 @@ resource "aws_launch_template" "app" {
   user_data = base64encode(templatefile("${path.module}/templates/user_data.sh.tftpl", {
     region          = var.region
     artifact_bucket = aws_s3_bucket.artifacts.id
+    images_bucket   = aws_s3_bucket.images.id
     app_version     = local.app_version
     db_host         = aws_db_instance.main.address
     db_name         = aws_db_instance.main.db_name
