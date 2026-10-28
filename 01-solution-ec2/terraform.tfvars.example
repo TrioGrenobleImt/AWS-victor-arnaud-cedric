@@ -1,4 +1,0 @@
-region             = "eu-west-3"
-notification_email = "you@example.com"
-asg_min_size       = 1
-asg_max_size       = 2

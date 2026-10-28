@@ -1,75 +1,104 @@
 # FISA Shop — AWS Project 2026
 
-Online vinyl record shop ("FISA Records") where customers browse a catalog, place orders and get a real-time
-confirmation. Orders are recorded for audit and trigger internal processing
-(packing, shipping simulation). Two implementations of the same functional
-scope are provided, both fully automated with Terraform and sized for the AWS
-Free Tier.
+Online vinyl record shop ("FISA Records") where customers browse a catalog,
+place orders and get a real-time confirmation. Orders are recorded for audit
+and trigger internal processing (packing, shipping simulation).
+
+One infrastructure, fully automated with Terraform and sized for the AWS Free
+Tier, combining **containers on EC2 (ECS)** for the request/response API and
+**Lambda** for event-driven work:
+
+| Runs on | What | Why |
+|---|---|---|
+| **ECS on EC2** (Express, Node.js) | Shop API: catalog, place order, track order | Answers users, always on, horizontal scaling behind an ALB |
+| **Lambda** (Node.js) | Order processing (SQS), audit trail (DynamoDB Stream) | Triggered by events, bursty, no idle cost |
+| **S3 + CloudFront** | Storefront (Vite) and product images | Static content at the edge, single HTTPS entry point |
+| **DynamoDB** | Products and orders (+ stream) | Serverless, always-free 25 RCU/WCU |
+
+Both the API and the Lambdas use the same code for the order domain
+(`backend/lib/`): order status changes are DynamoDB conditional writes
+(`PENDING → PACKING → SHIPPED`, `CANCELLED` from `PENDING`/`PACKING`), so any
+writer is safe, which is the base for future features such as order
+cancellation or a back office.
 
 ```
 .
-├── docs/                      # Architecture diagrams (SVG + PNG, generate_diagrams.py)
-├── shared/                    # Used by both solutions
-│   ├── catalog.json           #   product catalog (seed data, incl. image keys)
-│   ├── images/                #   product images uploaded to the images S3 bucket
-│   │   ├── covers/            #     album covers (one per product)
-│   │   └── generate_covers.py #     regenerates the placeholder SVG covers
-│   └── frontend/              #   Vite storefront (calls /api/*, loads /images/*)
-├── 00-account-baseline/       # Budget alerts + CloudTrail (deploy once)
-├── 01-solution-ec2/           # Solution 1: VMs (ALB + Auto Scaling + RDS)
-│   ├── app/                   #   Flask API + SQS worker (Python)
-│   ├── templates/             #   EC2 user data
-│   └── tests/                 #   test.sh, failover.sh
-└── 02-solution-serverless/    # Solution 2: CloudFront + API Gateway + Lambda + DynamoDB
-    ├── lambda/                #   api, order_processor, audit_stream
-    └── tests/                 #   test.sh
+├── frontend/                 # Vite storefront (calls /api/*, loads /images/*)
+├── images/                   # Product images uploaded to the images S3 bucket
+│   ├── covers/               #   album covers (one per product)
+│   └── generate_covers.py    #   regenerates the placeholder SVG covers
+├── data/catalog.json         # Product catalog (seeded into DynamoDB by Terraform)
+├── backend/
+│   ├── lib/                  #   shared order domain + AWS clients
+│   ├── api/                  #   Express shop API (ECS service), Dockerfile in backend/
+│   ├── functions/            #   Lambdas: order-processor, audit-stream
+│   └── test/                 #   unit tests (AWS clients stubbed)
+├── infra/                    # Single Terraform root module
+│   ├── baseline.tf           #   budget alerts + CloudTrail
+│   ├── network.tf            #   VPC, 2 public subnets
+│   ├── alb.tf, ecs.tf, ecr.tf#   ALB, ECS cluster/capacity provider/service, image build
+│   ├── lambda.tf             #   Lambda functions + triggers
+│   ├── dynamodb.tf, messaging.tf, storage.tf, cdn.tf, monitoring.tf
+├── tests/                    # test.sh (end to end), failover.sh
+└── docs/                     # Diagrams of the previous two-solution design (kept for comparison)
 ```
 
-Both solutions expose the same API, so the same frontend and test scenarios work on both:
+## API
 
 | Method | Path                | Purpose                                   |
 |--------|---------------------|-------------------------------------------|
-| GET    | `/api/health`       | Which backend / instance / AZ answered    |
+| GET    | `/api/health`       | Which ECS task / AZ answered               |
 | GET    | `/api/products`     | Catalog                                   |
 | POST   | `/api/orders`       | Place an order (one or more products)     |
 | GET    | `/api/orders/{id}`  | Order status + full history (audit)       |
-| GET    | `/images/{key}`     | Product image from the images S3 bucket   |
+| GET    | `/images/{key}`     | Product image (CloudFront → images S3 bucket) |
 
-Product images are stored in a private S3 bucket (`images/covers/*`, key =
-the product's `image` field). Solution 2 serves them through a CloudFront
-`/images/*` behavior (OAC); solution 1 answers `/images/*` with a redirect to
-a short-lived presigned S3 URL.
+## Architecture
 
-### Frontend (Vite)
-
-```bash
-cd shared/frontend
-npm ci
-npm run dev                                   # local mock API, no AWS needed
-SHOP_BACKEND=$(terraform -chdir=../../02-solution-serverless output -raw base_url) npm run dev   # against a deployed stack
-npm run build                                 # writes dist/, required before terraform apply
+```mermaid
+flowchart LR
+    U((Users)) -->|HTTPS| CF[CloudFront]
+    CF -->|/ OAC| S3W[(S3 website)]
+    CF -->|/images/* OAC| S3I[(S3 images)]
+    CF -->|/api/*| ALB[ALB<br/>CloudFront prefix list only]
+    subgraph VPC 10.10.0.0/16 — 2 AZs, public subnets
+      ALB --> T1[ECS task<br/>Express API]
+      ALB --> T2[ECS task<br/>Express API]
+      T1 & T2 -.- EC2[ECS capacity provider<br/>ASG t3.micro 1–2]
+    end
+    ECR[(ECR)] -.->|image| T1 & T2
+    T1 & T2 --> PT[(DynamoDB products)]
+    T1 & T2 --> OT[(DynamoDB orders)]
+    T1 & T2 -->|publish| SNS[SNS order-events]
+    SNS --> SQS[SQS + DLQ] --> L1[λ order-processor] --> OT
+    L1 -->|ORDER_SHIPPED| SNS
+    SNS --> Mail[Email]
+    OT -->|DynamoDB Stream| L2[λ audit-stream] --> S3A[(S3 audit<br/>versioned, 90 d)]
 ```
 
-## Event flow (common to both solutions)
+### Event flow
 
 ```mermaid
 sequenceDiagram
     participant C as Customer (browser)
-    participant API as Web tier (EC2 / Lambda)
-    participant DB as RDS / DynamoDB
+    participant API as Shop API (ECS)
+    participant DB as DynamoDB orders
     participant SNS as SNS order-events
     participant Q as SQS order-processing (+DLQ)
-    participant W as Worker (EC2 / Lambda)
+    participant W as λ order-processor
+    participant A as λ audit-stream → S3
     participant M as Email subscriber
 
     C->>API: POST /api/orders
-    API->>DB: store order (PENDING) + audit event
+    API->>DB: store order (PENDING)
     API->>SNS: publish ORDER_PLACED
     API-->>C: 201 confirmation (real time)
+    DB-->>A: stream INSERT
     SNS->>M: "Thank you for your order" email
     SNS->>Q: filter policy event_type = ORDER_PLACED
     Q->>W: consume
-    W->>DB: PACKING, then SHIPPED (+ audit events)
+    W->>DB: PACKING, then SHIPPED (conditional writes)
+    DB-->>A: stream MODIFY ×2
     W->>SNS: publish ORDER_SHIPPED (email only, filtered out of the queue)
     C->>API: GET /api/orders/{id} (polling every 2 s)
 ```
@@ -78,180 +107,112 @@ SNS message filtering keeps `ORDER_SHIPPED` events out of the processing queue,
 failed messages are retried 3 times and then moved to a dead-letter queue
 (which triggers a CloudWatch alarm).
 
-## Solution 1 — EC2 (virtual machines)
-
-![Solution 1 architecture](docs/architecture-solution-1-ec2.svg)
-
-<details><summary>Mermaid version</summary>
-
-```mermaid
-flowchart LR
-    U((Users)) -->|HTTP :80| ALB[Application Load Balancer]
-    subgraph VPC 10.10.0.0/16
-      subgraph AZ-a
-        P1[public subnet<br/>EC2 t3.micro<br/>gunicorn + worker]
-        D1[(private subnet<br/>RDS MySQL db.t4g.micro)]
-      end
-      subgraph AZ-b
-        P2[public subnet<br/>EC2 t3.micro<br/>gunicorn + worker]
-        D2[private subnet<br/>RDS standby - optional]
-      end
-    end
-    ALB --> P1 & P2
-    P1 & P2 --> D1
-    P1 & P2 -->|publish| SNS[SNS order-events] --> SQS[SQS + DLQ] -->|long polling| P1 & P2
-    SNS --> Mail[Email]
-    S3[(S3 artifacts)] -.->|user data| P1 & P2
-    SSM[SSM Parameter Store<br/>DB password] -.-> P1 & P2
-```
-
-</details>
-
-* **High availability**: Auto Scaling group (min 1, max 2) spread over 2 AZs
-  behind an ALB, ELB health checks on `/api/health` (unhealthy instances are
-  replaced automatically), CPU target-tracking scaling (60 %), rolling instance
-  refresh when the code changes. For an instance in each AZ at all times, deploy
-  with `-var asg_min_size=2`.
-* **Security**: RDS in private subnets with no Internet route; security groups
-  chain ALB → app (8080) → DB (3306); IMDSv2 only; encrypted EBS and RDS; DB
-  password generated by Terraform and stored as an SSM SecureString; no SSH
-  key — shell access through SSM Session Manager.
-* **Free Tier choices**: no NAT Gateway (instances use public IPs, inbound
-  locked to the ALB), single-AZ RDS (`db_multi_az = false`), gp2 20 GB.
-
-## Solution 2 — Serverless
-
-![Solution 2 architecture](docs/architecture-solution-2-serverless.svg)
-
-<details><summary>Mermaid version</summary>
-
-```mermaid
-flowchart LR
-    U((Users)) -->|HTTPS| CF[CloudFront]
-    CF -->|/ (OAC)| S3W[(S3 website<br/>private)]
-    CF -->|/api/*| APIGW[API Gateway HTTP API<br/>throttled]
-    APIGW --> L1[Lambda api]
-    L1 --> PT[(DynamoDB products)]
-    L1 --> OT[(DynamoDB orders)]
-    L1 -->|publish| SNS[SNS order-events]
-    SNS --> SQS[SQS + DLQ] --> L2[Lambda order_processor] --> OT
-    SNS --> Mail[Email]
-    OT -->|DynamoDB Stream| L3[Lambda audit_stream] --> S3A[(S3 audit<br/>versioned, 90 d lifecycle)]
-```
-
-</details>
-
-* **High availability by design**: every service is regional/multi-AZ or global
-  (CloudFront), scales to zero, nothing to patch.
+* **High availability**: 2 API tasks behind the ALB (health checks on
+  `/api/health`, replaced automatically, deployment circuit breaker with
+  rollback); tasks spread across AZs when 2 instances run
+  (`-var asg_min_size=2`); task auto scaling on CPU (60 %) and the ECS capacity
+  provider adds an instance when tasks no longer fit. DynamoDB, SQS, SNS,
+  Lambda, S3 and CloudFront are multi-AZ or global by design.
 * **Streaming**: DynamoDB Streams → Lambda replaces Kafka/MSK at zero cost; the
   audit bucket is partitioned by date (`orders/dt=YYYY-MM-DD/…`) so it can be
   queried with Athena for reporting.
-* **Security**: private S3 bucket reachable only through CloudFront Origin
-  Access Control; one least-privilege IAM role per Lambda; API throttling
-  (10 req/s, burst 20); X-Ray tracing; HTTPS only.
-* **Free Tier choices**: DynamoDB in provisioned mode (2 × 5 RCU/WCU ≤ 25
-  always free), arm64 Lambdas with 128 MB, CloudFront `PriceClass_100`,
-  7-day log retention, AWS managed/owned encryption keys.
+* **Security**: the ALB only accepts CloudFront (AWS managed prefix list) and
+  container instances only accept the ALB; private S3 buckets behind
+  CloudFront Origin Access Control; least-privilege IAM roles (one per Lambda,
+  a task role for the API, separate from the instance and execution roles);
+  IMDSv2 with hop limit 1 so containers cannot read the instance credentials;
+  encrypted EBS, SQS, SNS; ECR image scanning; no SSH (Session Manager);
+  CloudTrail on every API call.
+* **Free Tier choices**: ECS on EC2 instead of Fargate (no Fargate free tier),
+  no NAT Gateway (instances in public subnets, inbound locked to the ALB),
+  provisioned DynamoDB capacity, Container Insights off, 7-day log retention.
 
 ## Prerequisites
 
 * Terraform ≥ 1.6, AWS CLI v2, `jq`, `curl`
-* Node.js ≥ 20 (builds the Vite frontend)
+* Node.js ≥ 22 (frontend build, backend tests)
+* Docker with `buildx` running (Terraform builds and pushes the API image to ECR)
 * AWS credentials with permission to create the resources (`aws sts get-caller-identity`)
 * Default region: `eu-west-3` (Paris) — override with `-var region=…`
 
 ## Deploy
 
-Each folder is an independent Terraform root module with its own local state.
-Both solutions upload the frontend from `shared/frontend/dist`, so build it
-first (`cd shared/frontend && npm ci && npm run build`); `terraform apply`
-stops with an explicit error if it is missing.
-Copy `terraform.tfvars.example` to `terraform.tfvars` in each folder and set
-your email to receive the notifications (optional for the solutions).
-
 ```bash
-# 0. Account guardrails (once): 1 USD budget alerts + CloudTrail
-cd 00-account-baseline
-terraform init
-terraform apply -var alert_email=you@example.com
+# 1. Build the storefront (Terraform uploads frontend/dist)
+cd frontend && npm ci && npm run build && cd ..
+
+# 2. Deploy everything (~5–10 min, CloudFront is the longest step)
+cp infra/terraform.tfvars.example infra/terraform.tfvars   # set your email
+terraform -chdir=infra init
+terraform -chdir=infra apply
+terraform -chdir=infra output base_url
 ```
 
-```bash
-# 1. Solution EC2 (~10 min, RDS creation is the longest step)
-cd 01-solution-ec2
-terraform init
-terraform apply
-terraform output base_url
-```
-
-```bash
-# 2. Solution Serverless (~5 min, CloudFront distribution)
-cd 02-solution-serverless
-terraform init
-terraform apply
-terraform output base_url
-```
-
+`terraform apply` stops with an explicit error if `frontend/dist` is missing.
 Confirm the SNS subscription emails ("AWS Notification - Subscription
-Confirmation") to receive order confirmations and alarms.
+Confirmation") to receive order confirmations and alarms. After the first
+apply, the container instance needs 2–3 minutes to join the cluster and start
+the tasks; until then `/api/*` returns 502/503.
 
-On the EC2 solution, the instances need 3–5 minutes after `apply` to install
-the application and pass the ALB health checks; until then the ALB returns 502/503.
+## Develop
+
+```bash
+cd frontend
+npm run dev                                                          # mock API, no AWS needed
+SHOP_BACKEND=$(terraform -chdir=../infra output -raw base_url) npm run dev   # against the deployed stack
+
+cd backend
+npm ci && npm test                                                   # API + Lambdas with AWS clients stubbed
+```
 
 ## Test scenarios
 
-Open `base_url` in a browser: add products, place an order, and watch the status
-timeline go `PENDING → PACKING → SHIPPED`. The header shows which backend
-(instance + AZ for EC2) served the page.
-
-Automated scenarios:
+Open `base_url` in a browser: add records, place an order, and watch the status
+timeline go `PENDING → PACKING → SHIPPED`. The footer shows which ECS task and
+AZ answered.
 
 ```bash
-./01-solution-ec2/tests/test.sh           # load balancing, catalog, order, async processing
-./01-solution-ec2/tests/failover.sh       # terminate an instance, ASG replaces it (deploy with -var asg_min_size=2 to keep the site up meanwhile)
-./02-solution-serverless/tests/test.sh    # catalog, order, async processing, S3 audit trail, validation
+./tests/test.sh       # load balancing, catalog + image, order, async processing, S3 audit trail, validation
+./tests/failover.sh   # stop an API task: the ALB keeps serving and ECS starts a replacement
 ```
 
 Useful checks during the demo:
 
 ```bash
-# Audit trail (serverless): one JSON document per order change
-aws s3 ls s3://$(terraform -chdir=02-solution-serverless output -raw audit_bucket)/orders/ --recursive
+# Audit trail: one JSON document per order change
+aws s3 ls s3://$(terraform -chdir=infra output -raw audit_bucket)/orders/ --recursive
+
+# API logs (ECS) and processor logs (Lambda)
+aws logs tail /ecs/fisa-shop/shop-api --follow
+aws logs tail /aws/lambda/fisa-shop-order-processor --follow
 ```
 
-```bash
-# Worker logs on an EC2 instance (no SSH, through Session Manager)
-aws ssm start-session --target <instance-id>
-sudo journalctl -u shop-worker -f
-```
-
-CloudWatch dashboards are printed by `terraform output dashboard_url`.
+CloudWatch dashboard: `terraform -chdir=infra output dashboard_url`.
 
 ## Cost and Free Tier
 
 | Service | Usage | Free Tier coverage |
 |---|---|---|
-| EC2 t3.micro × 1–2 | ASG min 1 / max 2 | 750 h/month covers 1 instance full time; the 2nd one only runs under load (or with `asg_min_size=2`) |
+| EC2 t3.micro × 1–2 (ECS container instances) | ASG min 1 / max 2, 30 GB gp3 | 750 h/month covers 1 instance full time; the 2nd one only runs when tasks no longer fit (or with `asg_min_size=2`) |
+| ECS | cluster, service, capacity provider | no charge on EC2 |
+| ECR | 1 repository, last 5 images | 500 MB/month (12 months) |
 | ALB | 1 ALB | 750 h + 15 LCU/month (12-month legacy Free Tier). **Its public IPv4 addresses are billed** (~0.005 USD/h each ≈ 0.25 USD/day) |
-| RDS MySQL db.t4g.micro | single-AZ, 20 GB gp2 | 750 h/month + 20 GB (12 months) |
-| Lambda | 3 functions, arm64 128 MB | 1 M requests + 400 000 GB-s/month (always free) |
-| API Gateway HTTP API | | 1 M calls/month (12 months) |
+| Lambda | 2 functions, arm64 128 MB | 1 M requests + 400 000 GB-s/month (always free) |
 | DynamoDB | 2 tables × 5 RCU/WCU, Streams | 25 RCU/WCU + 25 GB + 2.5 M stream reads (always free) |
 | CloudFront | | 1 TB + 10 M requests/month (always free) |
-| S3 | artifacts, website, audit, trail | 5 GB (12 months) |
+| S3 | website, images, audit, trail | 5 GB (12 months) |
 | SNS / SQS | | 1 M publishes / 1 M requests (always free) |
-| CloudWatch | 10 alarms, 3 dashboards, logs 7 days | 10 alarms + 3 dashboards + 5 GB logs |
+| CloudWatch | 6 alarms, 1 dashboard, logs 7 days | 10 alarms + 3 dashboards + 5 GB logs |
 | CloudTrail | 1 trail, management events | first copy free |
+| Budgets | 1 budget | first 2 free |
 | KMS | AWS managed keys only | no monthly key fee |
-| SSM Parameter Store | standard SecureString | free |
 
 Accounts created after 15 July 2025 use the new Free Tier (credits up to
 200 USD for 6 months) instead of the 12-month offers; the setup stays well
-within those credits. In every case, **destroy the stacks after the demo**:
+within those credits. **Destroy the stack after the demo**:
 
 ```bash
-terraform -chdir=01-solution-ec2 destroy
-terraform -chdir=02-solution-serverless destroy
+terraform -chdir=infra destroy
 ```
 
 ## Not implemented (cost) — proposed alternatives
@@ -259,12 +220,11 @@ terraform -chdir=02-solution-serverless destroy
 | Need | Implemented (free) | Production alternative (paid) |
 |---|---|---|
 | Streaming | DynamoDB Streams → Lambda | Amazon MSK / MSK Serverless (Kafka) or Kinesis Data Streams → Firehose → S3 |
-| Private instances | public subnets + SG | private subnets + NAT Gateway or VPC endpoints |
-| Database HA | single-AZ RDS | RDS Multi-AZ / Aurora Serverless v2 |
-| Secrets | SSM SecureString | Secrets Manager with automatic rotation |
-| Custom domain + TLS on ALB | default DNS names | Route 53 hosted zone + ACM certificate |
-| Edge protection | API throttling | AWS WAF on CloudFront / ALB, Shield Advanced |
+| Private container instances | public subnets + SG (inbound from ALB only) | private subnets + NAT Gateway or VPC endpoints |
+| Database | DynamoDB provisioned 5 RCU/WCU | on-demand capacity, global tables, PITR backups |
+| Custom domain + TLS CloudFront → ALB | default DNS names, HTTP between CloudFront and ALB | Route 53 hosted zone + ACM certificates |
+| Edge protection | ALB reachable from CloudFront only | AWS WAF on CloudFront, Shield Advanced |
 | Customer emails | SNS topic subscription | Amazon SES transactional emails per customer |
-| Order workflow | worker with sleeps | Step Functions (packing → shipping → invoicing) |
+| Order workflow | Lambda with sleeps | Step Functions (packing → shipping → invoicing) |
 | Users / accounts | anonymous orders | Amazon Cognito user pools |
-| Containers | EC2 + systemd | ECS Fargate or EKS |
+| Container capacity | ECS on EC2 t3.micro (capacity provider) | ECS Fargate (no instances to manage) or EKS |
