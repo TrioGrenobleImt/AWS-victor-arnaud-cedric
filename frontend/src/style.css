@@ -152,9 +152,18 @@ main { max-width: 1180px; margin: 0 auto; padding: 8px 24px 48px; }
 .stock { margin: 8px 0 0; color: var(--muted); font-size: .78rem; }
 
 .footer {
-  border-top: 1px solid var(--line); padding: 16px 24px;
-  color: var(--muted); font-size: .8rem; text-align: center;
+  border-top: 1px solid var(--line); padding: 28px 24px 20px;
+  color: var(--muted); font-size: .85rem; text-align: center;
 }
+.footer-cols {
+  display: flex; flex-wrap: wrap; justify-content: center; gap: 24px 56px;
+  max-width: 960px; margin: 0 auto 20px;
+}
+.footer-cols > div { flex: 1 1 200px; }
+.footer h3 { margin: 0 0 6px; color: var(--ink); font-size: .85rem; font-weight: 600; }
+.footer p { margin: 0; }
+.footer a { color: inherit; }
+.footer-copy { font-size: .75rem; opacity: .8; }
 
 /* --- Crate drawer --------------------------------------------------------- */
 .scrim { position: fixed; inset: 0; z-index: 20; background: rgba(0, 0, 0, .55); }

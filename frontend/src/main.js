@@ -45,7 +45,7 @@ function renderCatalog() {
   );
   $("catalog").innerHTML = visible.length
     ? visible.map(card).join("")
-    : `<p class="muted">Nothing in this crate. Try another genre or search.</p>`;
+    : `<p class="muted">Nothing found. Try another genre or search.</p>`;
 }
 
 function card(p) {
@@ -66,7 +66,7 @@ function card(p) {
         <div class="buy">
           <span class="price">${euros(p.price)}</span>
           <button type="button" class="add" data-add="${escapeHtml(p.id)}" ${inCrate >= maxQty(p) ? "disabled" : ""}>
-            ${inCrate ? `In crate · ${inCrate}` : p.stock > 0 ? "Add to crate" : "Sold out"}
+            ${inCrate ? `In cart · ${inCrate}` : p.stock > 0 ? "Add to cart" : "Sold out"}
           </button>
         </div>
         <p class="stock">${p.stock > 0 ? `${escapeHtml(p.stock)} in stock` : "Out of stock"}</p>
@@ -86,7 +86,7 @@ function setQty(id, qty) {
 function saveCart() {
   try {
     sessionStorage.setItem(CART_KEY, JSON.stringify(state.cart));
-  } catch {} // private mode: the crate just won't survive a sign-in redirect
+  } catch {} // private mode: the cart just won't survive a sign-in redirect
 }
 
 function renderCart() {
@@ -115,14 +115,14 @@ function renderCart() {
             </div>`;
         })
         .join("")
-    : `<p class="muted empty">Your crate is empty. Go dig!</p>`;
+    : `<p class="muted empty">Your cart is empty.</p>`;
   $("total").textContent = euros(total);
   $("crateCount").textContent = count;
   $("placeOrder").disabled = !lines.length;
 }
 
 const VIEWS = { cart: "cartView", track: "trackView", orders: "ordersView" };
-const TITLES = { cart: "Your crate", track: "Your crate", orders: "My orders" };
+const TITLES = { cart: "Your cart", track: "Your cart", orders: "My orders" };
 function showView(view) {
   for (const [name, id] of Object.entries(VIEWS)) $(id).hidden = name !== view;
   $("drawerTitle").textContent = TITLES[view];
@@ -432,10 +432,6 @@ $("keepShopping").addEventListener("click", () => {
   showView("cart");
   openCrate(false);
 });
-
-api("/health")
-  .then((h) => ($("backend").textContent = `backend: ${h.backend} · ${h.instance || ""} ${h.az || ""}`))
-  .catch(() => ($("backend").textContent = "backend: unreachable"));
 
 async function loadProducts() {
   state.products = await api("/products");

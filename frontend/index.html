@@ -18,7 +18,7 @@
     <input id="search" class="search" type="search" placeholder="Search artist, album, genre…" aria-label="Search the catalog">
     <button id="account" class="account-btn" type="button" hidden>Sign in</button>
     <button id="openCrate" class="crate-btn" type="button">
-      Crate <span id="crateCount" class="badge">0</span>
+      Cart <span id="crateCount" class="badge">0</span>
     </button>
   </header>
 
@@ -36,11 +36,16 @@
 
   <main>
     <nav id="genres" class="genres" aria-label="Filter by genre"></nav>
-    <div id="catalog" class="catalog" aria-live="polite"><p class="muted">Loading the crates…</p></div>
+    <div id="catalog" class="catalog" aria-live="polite"><p class="muted">Loading the catalog…</p></div>
   </main>
 
   <footer class="footer">
-    <span id="backend">backend: …</span>
+    <div class="footer-cols">
+      <div><h3>Shipping</h3><p>Free over €60 · packed in sturdy mailers · tracked delivery</p></div>
+      <div><h3>Returns</h3><p>14 days to return unplayed records</p></div>
+      <div><h3>Contact</h3><p><a href="mailto:hello@fisa-records.example">hello@fisa-records.example</a></p></div>
+    </div>
+    <p class="footer-copy">© 2026 FISA Records · Independent vinyl shop</p>
   </footer>
 
   <section id="authPage" class="auth-page" hidden aria-labelledby="authTitle">
@@ -76,16 +81,16 @@
   </section>
 
   <div id="scrim" class="scrim" hidden></div>
-  <aside id="crate" class="drawer" aria-label="Your crate" aria-hidden="true">
+  <aside id="crate" class="drawer" aria-label="Your cart" aria-hidden="true">
     <div class="drawer-head">
-      <h2 id="drawerTitle">Your crate</h2>
+      <h2 id="drawerTitle">Your cart</h2>
       <button id="closeCrate" class="icon-btn" type="button" aria-label="Close">✕</button>
     </div>
 
     <div id="ordersView" hidden>
       <p id="ordersError" class="error" hidden></p>
       <div id="orders" class="orders"></div>
-      <button id="backToCrate" class="secondary" type="button">Back to your crate</button>
+      <button id="backToCrate" class="secondary" type="button">Back to your cart</button>
     </div>
 
     <div id="cartView">
