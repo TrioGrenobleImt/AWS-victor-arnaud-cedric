@@ -24,6 +24,22 @@ resource "aws_cloudwatch_metric_alarm" "dlq_not_empty" {
   alarm_actions       = [aws_sns_topic.alerts.arn]
 }
 
+resource "aws_cloudwatch_metric_alarm" "customer_emails_dlq_not_empty" {
+  count               = local.notify_customers ? 1 : 0
+  alarm_name          = "${var.project}-customer-emails-dlq-not-empty"
+  alarm_description   = "Customer emails failed 3 times and landed in the DLQ"
+  namespace           = "AWS/SQS"
+  metric_name         = "ApproximateNumberOfMessagesVisible"
+  dimensions          = { QueueName = aws_sqs_queue.customer_emails_dlq[0].name }
+  statistic           = "Maximum"
+  period              = 300
+  evaluation_periods  = 1
+  threshold           = 0
+  comparison_operator = "GreaterThanThreshold"
+  treat_missing_data  = "notBreaching"
+  alarm_actions       = [aws_sns_topic.alerts.arn]
+}
+
 resource "aws_cloudwatch_metric_alarm" "lambda_errors" {
   for_each            = local.functions
   alarm_name          = "${var.project}-${each.key}-errors"

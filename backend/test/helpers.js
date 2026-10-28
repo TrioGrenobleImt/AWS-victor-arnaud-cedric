@@ -2,17 +2,18 @@ import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { PutCommand } from "@aws-sdk/lib-dynamodb";
 import { after, before, beforeEach } from "node:test";
 import { createTables, deleteTables, startDynamoDbLocal } from "../dev/local-db.js";
-import { ddb, s3, sns } from "../lib/aws.js";
+import { ddb, s3, ses, sns } from "../lib/aws.js";
 
 export const PRODUCTS = [
   { id: "p-001", name: "Midnight Static", artist: "The Velvet Hours", genre: "Indie Rock", price: 27.9, stock: 40 },
   { id: "p-002", name: "Saffron Skies", artist: "Lena Okafor", genre: "Soul", price: 31.5, stock: 3 },
 ];
 
-// SNS and S3 calls are captured instead of sent.
-export const sent = { sns: [], s3: [] };
+// SNS, S3 and SES calls are captured instead of sent.
+export const sent = { sns: [], s3: [], ses: [] };
 sns.send = async (cmd) => void sent.sns.push(cmd.input);
 s3.send = async (cmd) => void sent.s3.push(cmd.input);
+ses.send = async (cmd) => void sent.ses.push(cmd.input);
 
 /** Fresh tables for the test file, products re-seeded before each test. */
 export function useTables() {
@@ -26,6 +27,7 @@ export function useTables() {
   beforeEach(async () => {
     sent.sns.length = 0;
     sent.s3.length = 0;
+    sent.ses.length = 0;
     for (const p of PRODUCTS) await ddb.send(new PutCommand({ TableName: tables.products, Item: p }));
   });
 }

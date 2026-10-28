@@ -11,4 +11,5 @@ Object.assign(process.env, {
   AUDIT_BUCKET: "audit",
   IMAGES_BUCKET: "images",
   DOCUMENTS_BUCKET: "documents",
+  SENDER_EMAIL: "shop@example.com",
 });

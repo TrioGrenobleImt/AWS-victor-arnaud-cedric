@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createApp } from "../api/app.js";
 import { handler as auditStream } from "../functions/audit-stream/index.js";
+import { handler as notifyCustomers } from "../functions/customer-notifier/index.js";
 import { handler as processOrders } from "../functions/order-processor/index.js";
 import { cancelOrder, getOrder, setStatus } from "../lib/orders.js";
 import { getProduct } from "../lib/products.js";
@@ -112,4 +113,26 @@ test("audit stream writes one S3 document per change", async () => {
   });
   assert.equal(sent.s3[0].Bucket, "audit");
   assert.equal(sent.s3[0].Key, "orders/dt=2026-01-01/o-1/000000-e1.json");
+});
+
+test("customer notifier emails the customer for every status", async () => {
+  const { order_id } = await placeOrder();
+  await setStatus(order_id, "PACKED", "packed", "test");
+  const shipped = await setStatus(order_id, "SHIPPED", "shipped", "test", { tracking_number: "TRK-1" });
+  const events = [orderEvent(sent.sns[0]), { ...orderEvent(sent.sns[0]), event_type: "ORDER_PACKED" }, { ...orderEvent(sent.sns[0]), event_type: "ORDER_SHIPPED", tracking_number: shipped.tracking_number }, { ...orderEvent(sent.sns[0]), event_type: "ORDER_CANCELLED" }];
+  const result = await notifyCustomers({ Records: events.map((e, i) => ({ messageId: `m${i}`, body: JSON.stringify(e) })) });
+  assert.deepEqual(result, { batchItemFailures: [] });
+  assert.equal(sent.ses.length, 4);
+  assert.ok(sent.ses.every((m) => m.FromEmailAddress === "shop@example.com" && m.Destination.ToAddresses[0] === "test@example.com"));
+  assert.match(sent.ses[0].Content.Simple.Subject.Data, /Thank you for your order/);
+  assert.match(sent.ses[2].Content.Simple.Body.Text.Data, /Tracking number: TRK-1/);
+  assert.match(sent.ses[3].Content.Simple.Subject.Data, /cancelled/);
+});
+
+test("customer notifier escapes HTML, ignores other events and reports send failures", async () => {
+  const base = { order_id: "abcdef123456", customer_name: "<b>Eve</b>", customer_email: "eve@example.com", items: [], total: 1 };
+  await notifyCustomers({ Records: [{ messageId: "a", body: JSON.stringify({ ...base, event_type: "ORDER_PLACED" }) }, { messageId: "b", body: JSON.stringify({ ...base, event_type: "OTHER" }) }] });
+  assert.equal(sent.ses.length, 1);
+  assert.match(sent.ses[0].Content.Simple.Body.Html.Data, /&lt;b&gt;Eve&lt;\/b&gt;/);
+  assert.deepEqual(await notifyCustomers({ Records: [{ messageId: "c", body: "not json" }] }), { batchItemFailures: [{ itemIdentifier: "c" }] });
 });

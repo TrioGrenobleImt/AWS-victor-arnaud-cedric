@@ -16,6 +16,12 @@ variable "notification_email" {
   default     = ""
 }
 
+variable "sender_email" {
+  description = "From address of the customer emails (order placed, packed, shipped, cancelled), sent through SES. Leave empty to disable. SES emails a verification link to it; in the SES sandbox, customers must be verified addresses too (request production access for real customers)."
+  type        = string
+  default     = ""
+}
+
 variable "admin_email" {
   description = "Email of the first back-office admin (Cognito sends a temporary password). Leave empty to create admins later."
   type        = string

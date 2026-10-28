@@ -14,7 +14,7 @@ Tier, combining **containers on EC2 (ECS)** for the request/response API and
 |---|---|---|
 | **ECS on EC2** (Express, Node.js) | Shop API: catalog, place order, track order | Answers users, always on, horizontal scaling behind an ALB |
 | **ECS on EC2** (Express, Node.js) | Admin API: products, stock, image uploads, orders, sales dashboard | Separate service + IAM role, same cluster and ALB (path rule) |
-| **Lambda** (Node.js) | Packing slips (SQS), audit trail (DynamoDB Stream) | Triggered by events, bursty, no idle cost |
+| **Lambda** (Node.js) | Packing slips (SQS), customer emails via SES (SQS), audit trail (DynamoDB Stream) | Triggered by events, bursty, no idle cost |
 | **S3 + CloudFront** | Storefront and back office (Vite), product images, packing slips | Static content at the edge, single HTTPS entry point |
 | **Cognito** | Back-office sign-in (hosted login, `admins` group) | Managed users/passwords, free Lite tier |
 | **DynamoDB** | Products and orders (+ stream, `by_month` index) | Serverless, always-free 25 RCU/WCU |
@@ -43,9 +43,9 @@ Both APIs and the Lambdas use the same code for the order domain
 │   ├── lib/                  #   shared order domain + AWS clients
 │   ├── api/                  #   Express shop API (ECS service), Dockerfile in backend/
 │   ├── admin/                #   Express admin API (2nd ECS service, Cognito tokens)
-│   ├── functions/            #   Lambdas: order-processor, audit-stream
+│   ├── functions/            #   Lambdas: order-processor, customer-notifier, audit-stream
 │   ├── dev/                  #   local backend: DynamoDB Local + S3 stand-in (`npm run dev`)
-│   └── test/                 #   tests against DynamoDB Local (SNS/S3 captured)
+│   └── test/                 #   tests against DynamoDB Local (SNS/S3/SES captured)
 ├── infra/                    # Single Terraform root module
 │   ├── baseline.tf           #   budget alerts + CloudTrail
 │   ├── network.tf            #   VPC, 2 public subnets
@@ -146,12 +146,12 @@ sequenceDiagram
     Q->>W: consume
     W->>DB: packing slip in S3, linked to the order
     B->>DB: PACKED, then SHIPPED + tracking (conditional writes)
-    B->>SNS: ORDER_PACKED / ORDER_SHIPPED (email only, filtered out of the queue)
+    B->>SNS: ORDER_PACKED / ORDER_SHIPPED (owner email + customer-emails queue, filtered out of the processing queue)
     DB-->>A: stream MODIFY ×2
     C->>API: GET /api/orders/{id} (polling every 5 s)
 ```
 
-SNS message filtering keeps `ORDER_SHIPPED` events out of the processing queue,
+SNS message filtering keeps `ORDER_PACKED`, `ORDER_SHIPPED` and `ORDER_CANCELLED` events out of the processing queue,
 failed messages are retried 3 times and then moved to a dead-letter queue
 (which triggers a CloudWatch alarm).
 
@@ -210,6 +210,13 @@ Confirm the SNS subscription emails ("AWS Notification - Subscription
 Confirmation") to receive order confirmations and alarms. After the first
 apply, the container instance needs 2–3 minutes to join the cluster and start
 the tasks; until then `/api/*` returns 502/503.
+
+**Customer emails**: set `sender_email` in `terraform.tfvars` and click the verification
+link SES sends to it. The `customer-notifier` Lambda then emails the customer when an
+order is placed, packed, shipped (with tracking number) or cancelled. New SES accounts
+are in sandbox mode and can only send to verified addresses: verify your test
+customers' addresses, or request SES production access for real customers.
+Without `sender_email` the feature is off.
 
 ## Develop
 

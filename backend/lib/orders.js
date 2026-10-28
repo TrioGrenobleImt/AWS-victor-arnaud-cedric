@@ -103,11 +103,15 @@ export async function createOrder(body, source) {
 
   const summary = lines.map((l) => `  - ${l.quantity} x ${l.name}`).join("\n");
   await publish("ORDER_PLACED", `Order confirmation ${order.order_id.slice(0, 8)}`, {
-    default: JSON.stringify({ event_type: "ORDER_PLACED", ...pick(order, "order_id", "customer_name", "customer_email", "total", "items") }),
+    default: eventPayload("ORDER_PLACED", order),
     email: `Hello ${order.customer_name},\n\nThank you for your order ${order.order_id}.\n${summary}\nTotal: ${total.toFixed(2)} EUR\n`,
   });
   return order;
 }
+
+/** JSON body of an order event: what the customer-notifier Lambda and the queue consumers read. */
+export const eventPayload = (eventType, order) =>
+  JSON.stringify({ event_type: eventType, ...pick(order, "order_id", "customer_name", "customer_email", "total", "items", "tracking_number") });
 
 export async function getOrder(orderId) {
   const { Item } = await ddb.send(new GetCommand({ TableName: env("ORDERS_TABLE"), Key: { order_id: orderId }, ConsistentRead: true }));

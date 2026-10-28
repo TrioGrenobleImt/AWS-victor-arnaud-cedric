@@ -3,7 +3,9 @@
 # idle cost. Each zip holds the function, backend/lib/ and a package.json
 # marking the code as ES modules; the AWS SDK v3 comes with the runtime.
 locals {
-  functions = {
+  notify_customers = var.sender_email != ""
+
+  functions = merge({
     order-processor = {
       description = "SQS consumer: writes the packing slip of each new order"
       timeout     = 15
@@ -19,7 +21,15 @@ locals {
         AUDIT_BUCKET = aws_s3_bucket.audit.id
       }
     }
-  }
+    }, local.notify_customers ? {
+    customer-notifier = {
+      description = "SQS consumer: emails the customer when an order is placed, packed, shipped or cancelled"
+      timeout     = 15
+      environment = {
+        SENDER_EMAIL = var.sender_email
+      }
+    }
+  } : {})
 
   lib_files = fileset(local.backend_dir, "lib/*.js")
 }
@@ -92,6 +102,23 @@ data "aws_iam_policy_document" "order_processor" {
   }
 }
 
+data "aws_iam_policy_document" "customer_notifier" {
+  count = local.notify_customers ? 1 : 0
+  statement {
+    actions   = ["sqs:ReceiveMessage", "sqs:DeleteMessage", "sqs:GetQueueAttributes"]
+    resources = [aws_sqs_queue.customer_emails[0].arn]
+  }
+  statement {
+    actions   = ["ses:SendEmail"]
+    resources = ["*"] # in the SES sandbox the recipient's identity is checked too
+    condition {
+      test     = "StringEquals"
+      variable = "ses:FromAddress"
+      values   = [var.sender_email]
+    }
+  }
+}
+
 data "aws_iam_policy_document" "audit_stream" {
   statement {
     actions   = ["dynamodb:DescribeStream", "dynamodb:GetRecords", "dynamodb:GetShardIterator", "dynamodb:ListStreams"]
@@ -104,10 +131,12 @@ data "aws_iam_policy_document" "audit_stream" {
 }
 
 locals {
-  function_policies = {
+  function_policies = merge({
     order-processor = data.aws_iam_policy_document.order_processor.json
     audit-stream    = data.aws_iam_policy_document.audit_stream.json
-  }
+    }, local.notify_customers ? {
+    customer-notifier = data.aws_iam_policy_document.customer_notifier[0].json
+  } : {})
 }
 
 resource "aws_iam_role_policy" "lambda" {
@@ -152,6 +181,15 @@ resource "aws_lambda_function" "fn" {
 resource "aws_lambda_event_source_mapping" "orders_queue" {
   event_source_arn        = aws_sqs_queue.orders.arn
   function_name           = aws_lambda_function.fn["order-processor"].arn
+  batch_size              = 5
+  function_response_types = ["ReportBatchItemFailures"]
+}
+
+# SQS -> customer-notifier
+resource "aws_lambda_event_source_mapping" "customer_emails_queue" {
+  count                   = local.notify_customers ? 1 : 0
+  event_source_arn        = aws_sqs_queue.customer_emails[0].arn
+  function_name           = aws_lambda_function.fn["customer-notifier"].arn
   batch_size              = 5
   function_response_types = ["ReportBatchItemFailures"]
 }

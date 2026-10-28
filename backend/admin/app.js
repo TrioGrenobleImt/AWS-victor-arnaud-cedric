@@ -2,7 +2,7 @@
 // the listener routes /admin/api/* here. Every route but /health needs an
 // admin token (Cognito "admins" group).
 import express from "express";
-import { STATUSES, getOrder, listOrders, publish, setStatus } from "../lib/orders.js";
+import { STATUSES, eventPayload, getOrder, listOrders, publish, setStatus } from "../lib/orders.js";
 import { addStock, createProduct, listProducts, updateProduct } from "../lib/products.js";
 import { currentMonth, monthlySales } from "../lib/sales.js";
 import { presignDocument, presignImageUpload } from "../lib/uploads.js";
@@ -83,7 +83,7 @@ export function createAdminApp({ verify }) {
     }
     const order = await setStatus(req.params.id, status, detail, source, extra);
     const [subject, message] = NOTIFY[status](order);
-    await publish(`ORDER_${status}`, subject, message);
+    await publish(`ORDER_${status}`, subject, { default: eventPayload(`ORDER_${status}`, order), email: message });
     res.json(order);
   });
 
