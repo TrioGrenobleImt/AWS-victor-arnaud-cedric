@@ -16,7 +16,7 @@ Tier, combining **containers on EC2 (ECS)** for the request/response API and
 | **ECS on EC2** (Express, Node.js) | Admin API: products, stock, image uploads, orders, sales dashboard, team accounts | Separate service + IAM role, same cluster and ALB (path rule) |
 | **Lambda** (Node.js) | Packing slips (SQS), customer emails via SES (SQS), audit trail (DynamoDB Stream) | Triggered by events, bursty, no idle cost |
 | **S3 + CloudFront** | Storefront and back office (Vite), product images, packing slips | Static content at the edge, single HTTPS entry point |
-| **Cognito** | Two user pools (free Lite tier): back-office sign-in (hosted login, `admins` / `owners` groups) and customer sign-in/up for the storefront | Managed users/passwords, kept apart so a customer can never reach the admin API |
+| **Cognito** | Two user pools (free Lite tier): back-office sign-in (hosted login, `admins` / `owners` groups) and customer sign-in/up for the storefront (own page, Cognito API) | Managed users/passwords, kept apart so a customer can never reach the admin API |
 | **DynamoDB** | Products and orders (+ stream, `by_month` index) | Serverless, always-free 25 RCU/WCU |
 
 Both APIs and the Lambdas use the same code for the order domain
@@ -82,8 +82,9 @@ Storefront API:
 | POST   | `/api/me/orders/{id}/cancel` | Cancel my order while it is still `ORDERED` (restocks; `409` once packed) |
 | GET    | `/images/{key}`     | Product image (CloudFront → images S3 bucket) |
 
-Customers sign in or up from the storefront (Cognito hosted login, optional:
-guests can still order). `POST /api/orders` with a customer token
+Customers sign in or up on the storefront's own page (`#/signin`, `#/signup`; email
+confirmation code, password reset; the browser calls the Cognito API directly,
+no hosted login page; optional: guests can still order). `POST /api/orders` with a customer token
 (`Authorization: Bearer <access token>`) attaches the order to the account
 (`customer_id`, `by_customer` index); `/api/me/*` requires the token and only
 ever returns or touches the caller's own orders.

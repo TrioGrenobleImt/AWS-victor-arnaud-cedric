@@ -235,6 +235,30 @@ pre {
 }
 .cancel-btn:hover { border-color: var(--accent); color: var(--accent); }
 
+/* --- Sign in / up page --------------------------------------------------------- */
+.auth-page {
+  position: fixed; inset: 0; z-index: 40; overflow-y: auto;
+  display: grid; place-items: center; padding: 24px 16px; background: var(--bg);
+}
+.auth-page[hidden] { display: none; }
+.auth-card {
+  width: min(400px, 100%); padding: 32px 28px; border-radius: 16px;
+  background: var(--bg-2); border: 1px solid var(--line);
+}
+.auth-card h1 { font-family: var(--display); margin: 22px 0 4px; font-size: 1.7rem; }
+.auth-card form label { display: block; font-size: .85rem; color: var(--muted); margin-bottom: 12px; }
+.auth-card input {
+  display: block; width: 100%; margin-top: 4px; padding: 11px 12px;
+  border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--ink);
+}
+.auth-card input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+.auth-card input[readonly] { opacity: .6; }
+.auth-card .primary:disabled { opacity: .6; }
+.auth-card a { color: var(--accent); }
+.auth-links { display: flex; justify-content: space-between; font-size: .85rem; margin: 14px 0 0; }
+.auth-switch { text-align: center; font-size: .9rem; margin: 14px 0 0; }
+.info { color: var(--ok); font-size: .9rem; }
+
 /* --- Small screens -------------------------------------------------------- */
 @media (max-width: 760px) {
   .topbar { flex-wrap: wrap; padding: 10px 16px; }
@@ -245,3 +269,5 @@ pre {
   main { padding: 0 16px 40px; }
   .catalog { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 14px; }
 }
+.auth-open { overflow: hidden; }
+.auth-card [hidden] { display: none; }

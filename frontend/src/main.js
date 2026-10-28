@@ -183,15 +183,7 @@ async function placeOrder(event) {
   } catch (e) {
     $("checkoutError").textContent = "Order failed: " + e.message;
     $("checkoutError").hidden = false;
-    auth
-  .init()
-  .then((session) => {
-    state.user = session;
-  })
-  .catch((e) => console.warn(e.message))
-  .finally(renderAccount);
-
-loadProducts().catch(() => {}); // e.g. sold out meanwhile: show the current stock
+    loadProducts().catch(() => {}); // e.g. sold out meanwhile: show the current stock
   } finally {
     button.disabled = !Object.keys(state.cart).length;
   }
@@ -211,7 +203,12 @@ function renderAccount() {
     menu.className = "account-btn";
     menu.textContent = "Sign out";
     menu.title = user.email;
-    menu.addEventListener("click", auth.signOut);
+    menu.addEventListener("click", () => {
+      auth.signOut();
+      state.user = null;
+      renderAccount();
+      openCrate(false);
+    });
     button.after(menu);
   }
   if (!user && menu) menu.remove();
@@ -224,10 +221,105 @@ function renderAccount() {
   }
 }
 
-async function signIn(page) {
-  state.user = await auth.signIn(page);
+// --- Sign in / up page (#/signin, #/signup, #/forgot) -----------------------------
+// mode: signin | signup | confirm (emailed code after signing up) | forgot | reset
+const AUTH_MODES = {
+  signin: { title: "Sign in", lede: "Follow your orders and cancel them while they are not packed yet.", submit: "Sign in" },
+  signup: { title: "Create your account", lede: "It only takes an email and a password.", submit: "Create account" },
+  confirm: { title: "Check your inbox", lede: "We emailed you a code to confirm your address.", submit: "Confirm and sign in" },
+  forgot: { title: "Reset your password", lede: "We will email you a code to choose a new one.", submit: "Send the code" },
+  reset: { title: "Choose a new password", lede: "Enter the code we emailed you.", submit: "Save and sign in" },
+};
+let authMode = null; // nothing rendered yet
+let pendingPassword = ""; // kept in memory between sign-up and confirmation, to sign in right after
+
+function setAuthMessage(kind, text) {
+  $("authError").hidden = kind !== "error" || !text;
+  $("authInfo").hidden = kind !== "info" || !text;
+  (kind === "error" ? $("authError") : $("authInfo")).textContent = text ?? "";
+}
+
+function renderAuth(mode, info) {
+  authMode = mode;
+  const m = AUTH_MODES[mode];
+  const codeStep = mode === "confirm" || mode === "reset";
+  $("authTitle").textContent = m.title;
+  $("authLede").textContent = m.lede;
+  $("authSubmit").textContent = m.submit;
+  $("codeRow").hidden = !codeStep;
+  $("authCode").required = codeStep;
+  $("passwordRow").hidden = mode === "forgot" || mode === "confirm";
+  $("authPassword").required = !$("passwordRow").hidden;
+  $("authPassword").autocomplete = mode === "signin" ? "current-password" : "new-password";
+  $("passwordHint").hidden = mode !== "signup" && mode !== "reset";
+  $("authEmail").readOnly = codeStep;
+  $("linkForgot").hidden = mode !== "signin";
+  $("linkResend").hidden = mode !== "confirm";
+  $("switchText").textContent = mode === "signup" ? "Already have an account?" : mode === "signin" ? "New here?" : "";
+  $("switchLink").textContent = mode === "signup" ? "Sign in" : mode === "signin" ? "Create an account" : "Back to sign in";
+  $("switchLink").href = mode === "signin" ? "#/signup" : "#/signin";
+  setAuthMessage(info ? "info" : "error", info);
+  $("authCode").value = "";
+  (codeStep ? $("authCode") : $("authEmail").value ? $("authPassword") : $("authEmail")).focus();
+}
+
+function route() {
+  const page = location.hash.match(/^#\/(signin|signup|forgot)$/)?.[1];
+  $("authPage").hidden = !page || !auth.enabled();
+  document.body.classList.toggle("auth-open", !$("authPage").hidden);
+  if (!$("authPage").hidden && page !== authMode && !(authMode === "confirm" && page === "signup") && !(authMode === "reset" && page === "forgot")) {
+    renderAuth(page);
+  }
+}
+
+async function finishSignIn(email, password) {
+  state.user = await auth.signIn(email, password);
+  pendingPassword = "";
   renderAccount();
-  if (state.user) showOrders();
+  location.hash = "";
+  showOrders();
+}
+
+async function submitAuth(event) {
+  event.preventDefault();
+  const email = $("authEmail").value.trim().toLowerCase();
+  const password = $("authPassword").value;
+  const code = $("authCode").value;
+  if (!email.includes("@")) return setAuthMessage("error", "Enter a valid email address.");
+  if (!$("passwordRow").hidden && !password) return setAuthMessage("error", "Enter your password.");
+  if (!$("codeRow").hidden && !code.trim()) return setAuthMessage("error", "Enter the code from the email.");
+  setAuthMessage();
+  $("authSubmit").disabled = true;
+  try {
+    if (authMode === "signin") {
+      try {
+        await finishSignIn(email, password);
+      } catch (e) {
+        if (e.code !== "UserNotConfirmedException") throw e;
+        pendingPassword = password;
+        await auth.resendCode(email);
+        renderAuth("confirm", "Your address is not confirmed yet. We sent you a new code.");
+      }
+    } else if (authMode === "signup") {
+      await auth.signUp(email, password);
+      pendingPassword = password;
+      renderAuth("confirm", `We sent a code to ${email}.`);
+    } else if (authMode === "confirm") {
+      await auth.confirmSignUp(email, code);
+      if (!pendingPassword) return renderAuth("signin", "Email confirmed. You can sign in now.");
+      await finishSignIn(email, pendingPassword);
+    } else if (authMode === "forgot") {
+      await auth.forgotPassword(email);
+      renderAuth("reset", `We sent a code to ${email}.`);
+    } else if (authMode === "reset") {
+      await auth.resetPassword(email, code, password);
+      await finishSignIn(email, password);
+    }
+  } catch (e) {
+    setAuthMessage("error", e.message);
+  } finally {
+    $("authSubmit").disabled = false;
+  }
 }
 
 function orderCard(o) {
@@ -308,11 +400,23 @@ $("closeCrate").addEventListener("click", () => openCrate(false));
 $("scrim").addEventListener("click", () => openCrate(false));
 document.addEventListener("keydown", (e) => e.key === "Escape" && openCrate(false));
 $("checkout").addEventListener("submit", placeOrder);
-$("account").addEventListener("click", () => (state.user ? showOrders() : signIn("login")));
-$("hintSignIn").addEventListener("click", (e) => {
+$("account").addEventListener("click", () => (state.user ? showOrders() : (location.hash = "#/signin")));
+$("authForm").addEventListener("submit", submitAuth);
+$("authBack").addEventListener("click", (e) => {
   e.preventDefault();
-  signIn("login");
+  history.replaceState(null, "", location.pathname);
+  route();
 });
+$("linkResend").addEventListener("click", async (e) => {
+  e.preventDefault();
+  try {
+    await auth.resendCode($("authEmail").value);
+    setAuthMessage("info", "A new code is on its way.");
+  } catch (err) {
+    setAuthMessage("error", err.message);
+  }
+});
+window.addEventListener("hashchange", route);
 $("orders").addEventListener("click", (e) => {
   const id = e.target.closest("[data-cancel]")?.dataset.cancel;
   if (id) cancelOrder(id);
@@ -345,6 +449,9 @@ auth
     state.user = session;
   })
   .catch((e) => console.warn(e.message))
-  .finally(renderAccount);
+  .finally(() => {
+    renderAccount();
+    route(); // deep link to #/signin
+  });
 
 loadProducts().catch((e) => ($("catalog").innerHTML = `<p class="error">Could not load the catalog: ${escapeHtml(e.message)}</p>`));

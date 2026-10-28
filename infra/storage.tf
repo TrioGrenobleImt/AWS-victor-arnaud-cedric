@@ -103,17 +103,16 @@ resource "aws_s3_object" "backoffice_config" {
   })
 }
 
-# Runtime settings of the storefront (customer sign-in through the Cognito hosted login).
+# Runtime settings of the storefront (customer sign-in page, Cognito API).
 resource "aws_s3_object" "web_config" {
   bucket        = aws_s3_bucket.web.id
   key           = "config.json"
   content_type  = "application/json"
   cache_control = "no-cache"
   content = jsonencode({
-    auth        = "cognito"
-    domain      = "${aws_cognito_user_pool_domain.customers.domain}.auth.${var.region}.amazoncognito.com"
-    clientId    = aws_cognito_user_pool_client.storefront.id
-    redirectUri = local.storefront_url
+    auth     = "cognito"
+    region   = var.region
+    clientId = aws_cognito_user_pool_client.storefront.id
   })
 }
 

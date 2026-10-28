@@ -112,8 +112,9 @@ resource "aws_cognito_user_in_group" "owner" {
 # --- Storefront sign-in: customers' own user pool ------------------------------
 # Separate from the back-office pool so a customer account can never reach the
 # admin API. Anyone can sign up (email + password, confirmed with a code Cognito
-# emails); ordering still works without an account. The storefront uses the same
-# hosted login + PKCE flow, and the shop API verifies the access tokens.
+# emails); ordering still works without an account. The storefront has its own
+# sign-in/up page that talks to the Cognito API directly (no hosted UI, hence no
+# domain), and the shop API verifies the access tokens.
 resource "aws_cognito_user_pool" "customers" {
   name                     = "${var.project}-customers"
   user_pool_tier           = "LITE"
@@ -137,25 +138,13 @@ resource "aws_cognito_user_pool" "customers" {
   }
 }
 
-resource "aws_cognito_user_pool_domain" "customers" {
-  domain                = "${var.project}-shop-${data.aws_caller_identity.current.account_id}"
-  user_pool_id          = aws_cognito_user_pool.customers.id
-  managed_login_version = 1
-}
-
 resource "aws_cognito_user_pool_client" "storefront" {
   name         = "storefront"
   user_pool_id = aws_cognito_user_pool.customers.id
 
-  generate_secret                      = false # public SPA client, protected by PKCE
-  allowed_oauth_flows_user_pool_client = true
-  allowed_oauth_flows                  = ["code"]
-  allowed_oauth_scopes                 = ["openid", "email", "profile"]
-  supported_identity_providers         = ["COGNITO"]
-  callback_urls                        = [local.storefront_url]
-  logout_urls                          = [local.storefront_url]
+  generate_secret = false # public SPA client: the password goes straight to Cognito over TLS
 
-  explicit_auth_flows           = ["ALLOW_REFRESH_TOKEN_AUTH"]
+  explicit_auth_flows           = ["ALLOW_USER_PASSWORD_AUTH", "ALLOW_REFRESH_TOKEN_AUTH"]
   prevent_user_existence_errors = "ENABLED"
   access_token_validity         = 60
   id_token_validity             = 60

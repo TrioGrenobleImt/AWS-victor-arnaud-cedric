@@ -10,7 +10,6 @@ locals {
   cache_policy_disabled          = "4135ea2d-6df8-44a3-9df3-4b5a84be39ad" # Managed-CachingDisabled
   origin_request_all_except_host = "b689b0a8-53d0-40ab-baf2-68738e2966ac" # Managed-AllViewerExceptHostHeader
 
-  storefront_url = "https://${aws_cloudfront_distribution.main.domain_name}/"
   backoffice_url = "https://${aws_cloudfront_distribution.backoffice.domain_name}/"
 }
 
