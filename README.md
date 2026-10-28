@@ -54,7 +54,7 @@ Both APIs and the Lambdas use the same code for the order domain
 │   ├── lambda.tf             #   Lambda functions + triggers
 │   ├── dynamodb.tf, messaging.tf, storage.tf, cdn.tf, monitoring.tf
 ├── tests/                    # test.sh (end to end), failover.sh
-└── docs/                     # Diagrams of the previous two-solution design (kept for comparison)
+└── docs/                     # Architecture diagram (architecture.svg, regenerate with generate_diagrams.py)
 ```
 
 ## Addresses and API
