@@ -190,6 +190,7 @@ async function placeOrder(event) {
 }
 
 // --- Account + my orders --------------------------------------------------------
+let autoName = ""; // last name filled in from the account
 function renderAccount() {
   const user = state.user;
   const button = $("account");
@@ -217,7 +218,8 @@ function renderAccount() {
   $("email").readOnly = !!user; // order emails go to the account's address
   if (user) {
     $("email").value = user.email;
-    if ($("name").value === "Demo Customer") $("name").value = user.email.split("@")[0];
+    const name = user.name || user.email.split("@")[0];
+    if (["", "Demo Customer", autoName].includes($("name").value)) $("name").value = autoName = name; // never overwrite what they typed
   }
 }
 
@@ -246,6 +248,7 @@ function renderAuth(mode, info) {
   $("authTitle").textContent = m.title;
   $("authLede").textContent = m.lede;
   $("authSubmit").textContent = m.submit;
+  $("nameRow").hidden = mode !== "signup";
   $("codeRow").hidden = !codeStep;
   $("authCode").required = codeStep;
   $("passwordRow").hidden = mode === "forgot" || mode === "confirm";
@@ -253,14 +256,14 @@ function renderAuth(mode, info) {
   $("authPassword").autocomplete = mode === "signin" ? "current-password" : "new-password";
   $("passwordHint").hidden = mode !== "signup" && mode !== "reset";
   $("authEmail").readOnly = codeStep;
-  $("linkForgot").hidden = mode !== "signin";
+  $("linkForgot").parentElement.hidden = mode !== "signin";
   $("linkResend").hidden = mode !== "confirm";
   $("switchText").textContent = mode === "signup" ? "Already have an account?" : mode === "signin" ? "New here?" : "";
   $("switchLink").textContent = mode === "signup" ? "Sign in" : mode === "signin" ? "Create an account" : "Back to sign in";
   $("switchLink").href = mode === "signin" ? "#/signup" : "#/signin";
   setAuthMessage(info ? "info" : "error", info);
   $("authCode").value = "";
-  (codeStep ? $("authCode") : $("authEmail").value ? $("authPassword") : $("authEmail")).focus();
+  (codeStep ? $("authCode") : mode === "signup" ? $("authFirst") : $("authEmail").value ? $("authPassword") : $("authEmail")).focus();
 }
 
 function route() {
@@ -285,6 +288,9 @@ async function submitAuth(event) {
   const email = $("authEmail").value.trim().toLowerCase();
   const password = $("authPassword").value;
   const code = $("authCode").value;
+  const first = $("authFirst").value.trim();
+  const last = $("authLast").value.trim();
+  if (authMode === "signup" && (!first || !last)) return setAuthMessage("error", "Enter your first and last name.");
   if (!email.includes("@")) return setAuthMessage("error", "Enter a valid email address.");
   if (!$("passwordRow").hidden && !password) return setAuthMessage("error", "Enter your password.");
   if (!$("codeRow").hidden && !code.trim()) return setAuthMessage("error", "Enter the code from the email.");
@@ -301,7 +307,7 @@ async function submitAuth(event) {
         renderAuth("confirm", "Your address is not confirmed yet. We sent you a new code.");
       }
     } else if (authMode === "signup") {
-      await auth.signUp(email, password);
+      await auth.signUp(email, password, first, last);
       pendingPassword = password;
       renderAuth("confirm", `We sent a code to ${email}.`);
     } else if (authMode === "confirm") {

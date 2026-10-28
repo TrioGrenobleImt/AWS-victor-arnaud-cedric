@@ -53,9 +53,14 @@
       <p id="authLede" class="muted"></p>
 
       <form id="authForm" novalidate>
+        <div id="nameRow" class="name-row" hidden>
+          <label>First name<input id="authFirst" autocomplete="given-name" maxlength="60"></label>
+          <label>Last name<input id="authLast" autocomplete="family-name" maxlength="60"></label>
+        </div>
         <label id="emailRow">Email<input id="authEmail" type="email" autocomplete="email" required></label>
         <label id="codeRow" hidden>Code from the email<input id="authCode" inputmode="numeric" autocomplete="one-time-code"></label>
         <label id="passwordRow">Password<input id="authPassword" type="password" autocomplete="current-password" required></label>
+        <p class="forgot"><a href="#/forgot" id="linkForgot">Forgot your password?</a></p>
         <p id="passwordHint" class="muted small" hidden>At least 10 characters, with upper and lower case letters and a number.</p>
         <p id="authError" class="error" role="alert" hidden></p>
         <p id="authInfo" class="info" role="status" hidden></p>
@@ -63,7 +68,6 @@
       </form>
 
       <p class="auth-links">
-        <a href="#/forgot" id="linkForgot">Forgot your password?</a>
         <a href="#" id="linkResend" hidden>Send a new code</a>
       </p>
       <p class="auth-switch muted"><span id="switchText"></span> <a id="switchLink" href="#"></a></p>

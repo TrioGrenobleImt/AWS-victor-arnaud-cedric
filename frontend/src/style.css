@@ -271,3 +271,5 @@ pre {
 }
 .auth-open { overflow: hidden; }
 .auth-card [hidden] { display: none; }
+.auth-card .forgot { margin: -6px 0 14px; text-align: right; font-size: .85rem; }
+.auth-card .name-row:not([hidden]) { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }

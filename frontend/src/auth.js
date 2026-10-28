@@ -70,19 +70,35 @@ export const enabled = () => config.auth === "cognito" || config.auth === "dev";
 /** Current access token, or null for a guest or an expired session. */
 export const token = () => readSession()?.access_token ?? null;
 
+let devName = ""; // dev mode has no user pool to remember the name given at sign-up
+
+const fullName = (claims) => [claims.given_name, claims.family_name].filter(Boolean).join(" ");
+
 export async function signIn(email, password) {
-  if (config.auth === "dev") return store({ access_token: `dev:${email}`, email, expires_at: Date.now() + 3600_000 });
+  if (config.auth === "dev") return store({ access_token: `dev:${email}`, email, name: devName, expires_at: Date.now() + 3600_000 });
   const { AuthenticationResult: r } = await cognito("InitiateAuth", {
     AuthFlow: "USER_PASSWORD_AUTH",
     AuthParameters: { USERNAME: email, PASSWORD: password },
   });
-  return store({ access_token: r.AccessToken, email: decode(r.IdToken).email ?? email, expires_at: Date.now() + r.ExpiresIn * 1000 });
+  const claims = decode(r.IdToken);
+  return store({ access_token: r.AccessToken, email: claims.email ?? email, name: fullName(claims), expires_at: Date.now() + r.ExpiresIn * 1000 });
 }
 
 /** Creates the account; Cognito emails a confirmation code (confirmSignUp). */
-export async function signUp(email, password) {
-  if (config.auth === "dev") return;
-  await cognito("SignUp", { Username: email, Password: password, UserAttributes: [{ Name: "email", Value: email }] });
+export async function signUp(email, password, givenName, familyName) {
+  if (config.auth === "dev") {
+    devName = `${givenName} ${familyName}`;
+    return;
+  }
+  await cognito("SignUp", {
+    Username: email,
+    Password: password,
+    UserAttributes: [
+      { Name: "email", Value: email },
+      { Name: "given_name", Value: givenName },
+      { Name: "family_name", Value: familyName },
+    ],
+  });
 }
 
 export async function confirmSignUp(email, code) {
