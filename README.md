@@ -13,10 +13,10 @@ Tier, combining **containers on EC2 (ECS)** for the request/response API and
 | Runs on | What | Why |
 |---|---|---|
 | **ECS on EC2** (Express, Node.js) | Shop API: catalog, place order, track order | Answers users, always on, horizontal scaling behind an ALB |
-| **ECS on EC2** (Express, Node.js) | Admin API: products, stock, image uploads, orders, sales dashboard | Separate service + IAM role, same cluster and ALB (path rule) |
+| **ECS on EC2** (Express, Node.js) | Admin API: products, stock, image uploads, orders, sales dashboard, team accounts | Separate service + IAM role, same cluster and ALB (path rule) |
 | **Lambda** (Node.js) | Packing slips (SQS), customer emails via SES (SQS), audit trail (DynamoDB Stream) | Triggered by events, bursty, no idle cost |
 | **S3 + CloudFront** | Storefront and back office (Vite), product images, packing slips | Static content at the edge, single HTTPS entry point |
-| **Cognito** | Back-office sign-in (hosted login, `admins` group) | Managed users/passwords, free Lite tier |
+| **Cognito** | Back-office sign-in (hosted login, `admins` / `owners` groups) | Managed users/passwords, free Lite tier |
 | **DynamoDB** | Products and orders (+ stream, `by_month` index) | Serverless, always-free 25 RCU/WCU |
 
 Both APIs and the Lambdas use the same code for the order domain
@@ -204,8 +204,12 @@ terraform -chdir=infra output backoffice_url
 
 `terraform apply` stops with an explicit error if a `dist/` folder is missing.
 With `admin_email` set, Cognito emails that admin a temporary password; sign in
-at `backoffice_url` and choose a new password. More admins: create the user in
-the Cognito console and add them to the `admins` group.
+at `backoffice_url` and choose a new password. That first admin is an **owner**:
+the **Team** page invites more people (Cognito emails them a temporary password).
+Two roles: **staff** use the back office (orders, products, dashboard); **owners**
+also manage accounts (invite, change role, disable, remove). Roles are the
+`admins` Cognito group (everyone) plus `owners`; owners can't change or remove
+their own account, so one owner always remains.
 Confirm the SNS subscription emails ("AWS Notification - Subscription
 Confirmation") to receive order confirmations and alarms. After the first
 apply, the container instance needs 2–3 minutes to join the cluster and start

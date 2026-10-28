@@ -260,6 +260,22 @@ data "aws_iam_policy_document" "admin_task" {
     actions   = ["sns:Publish"]
     resources = [aws_sns_topic.orders.arn]
   }
+  statement {
+    sid = "ManageBackOfficeAccounts" # the Team page: invite, change role, disable, remove
+    actions = [
+      "cognito-idp:ListUsersInGroup",
+      "cognito-idp:AdminGetUser",
+      "cognito-idp:AdminListGroupsForUser",
+      "cognito-idp:AdminCreateUser",
+      "cognito-idp:AdminAddUserToGroup",
+      "cognito-idp:AdminRemoveUserFromGroup",
+      "cognito-idp:AdminEnableUser",
+      "cognito-idp:AdminDisableUser",
+      "cognito-idp:AdminDeleteUser",
+      "cognito-idp:AdminUserGlobalSignOut",
+    ]
+    resources = [aws_cognito_user_pool.admin.arn]
+  }
 }
 
 resource "aws_iam_role" "task" {

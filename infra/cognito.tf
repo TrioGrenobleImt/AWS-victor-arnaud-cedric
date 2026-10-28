@@ -1,6 +1,7 @@
 # --- Back-office sign-in: Cognito user pool (Lite tier, free up to 10k MAU) ----
-# Admins are created by Terraform (or in the console) and must be in the
-# "admins" group; there is no self sign-up. The SPA uses the Cognito hosted
+# Back-office users must be in the "admins" group; there is no self sign-up.
+# Members of "owners" (a second group) can also manage the team from the back
+# office itself (admin API -> Cognito), so everyone else is just "staff". The SPA uses the Cognito hosted
 # login page (authorization code + PKCE) and the admin API verifies the access
 # tokens (signature, expiry, client id, group).
 # backoffice_url (the back office's own CloudFront address) is defined in cdn.tf.
@@ -75,7 +76,13 @@ resource "aws_cognito_user_group" "admins" {
   description  = "Back-office administrators"
 }
 
-# First admin: Cognito emails a temporary password, changed at first sign-in.
+resource "aws_cognito_user_group" "owners" {
+  name         = "owners"
+  user_pool_id = aws_cognito_user_pool.admin.id
+  description  = "Back-office owners: also create, change and remove back-office accounts"
+}
+
+# First admin (an owner, so someone can invite the rest): Cognito emails a temporary password, changed at first sign-in.
 resource "aws_cognito_user" "admin" {
   count                    = var.admin_email != "" ? 1 : 0
   user_pool_id             = aws_cognito_user_pool.admin.id
@@ -92,5 +99,12 @@ resource "aws_cognito_user_in_group" "admin" {
   count        = var.admin_email != "" ? 1 : 0
   user_pool_id = aws_cognito_user_pool.admin.id
   group_name   = aws_cognito_user_group.admins.name
+  username     = aws_cognito_user.admin[0].username
+}
+
+resource "aws_cognito_user_in_group" "owner" {
+  count        = var.admin_email != "" ? 1 : 0
+  user_pool_id = aws_cognito_user_pool.admin.id
+  group_name   = aws_cognito_user_group.owners.name
   username     = aws_cognito_user.admin[0].username
 }

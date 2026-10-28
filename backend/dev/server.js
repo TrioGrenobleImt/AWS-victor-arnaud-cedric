@@ -25,6 +25,7 @@ const { createTables, startDynamoDbLocal } = await import("./local-db.js");
 const { ddb, sns } = await import("../lib/aws.js");
 const { createApp } = await import("../api/app.js");
 const { createAdminApp } = await import("../admin/app.js");
+const { memoryDirectory } = await import("./memory-directory.js");
 const { handler: processOrders } = await import("../functions/order-processor/index.js");
 
 const ROOT = resolve(import.meta.dirname, "../..");
@@ -93,10 +94,14 @@ s3.listen(8090);
 // --- APIs + images ------------------------------------------------------------
 const verify = async (token) => {
   if (token !== "dev") throw new Error("invalid token");
-  return { username: "dev-admin", groups: ["admins"] };
+  return { username: "dev-admin", groups: ["admins", "owners"] };
 };
+const directory = memoryDirectory([
+  { username: "dev-admin", email: "dev-admin@example.com", role: "owner" },
+  { email: "packer@example.com", role: "staff" },
+]);
 const shop = createApp({ instance: () => ({ instance: "dev", az: "local" }) });
-const admin = createAdminApp({ verify });
+const admin = createAdminApp({ verify, directory });
 const app = express();
 app.get("/images/*key", async (req, res) => {
   const key = `images/${req.params.key.join("/")}`;

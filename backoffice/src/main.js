@@ -31,6 +31,7 @@ function toast(message, error = false) {
   toast.timer = setTimeout(() => (el.hidden = true), 3500);
 }
 
+let profile = { role: "staff" };
 const state = { month: thisMonth(), orderFilter: "ORDERED" };
 
 // --- Dashboard ----------------------------------------------------------------
@@ -315,6 +316,91 @@ async function productForm(id) {
   });
 }
 
+// --- Team (owners) ------------------------------------------------------------
+const ROLE = { owner: { label: "Owner", tone: "info" }, staff: { label: "Staff", tone: "" } };
+const roleBadge = (role) => `<span class="badge ${ROLE[role]?.tone ?? ""}">${esc(ROLE[role]?.label ?? role)}</span>`;
+const accountStatus = (u) =>
+  !u.enabled ? `<span class="badge">Disabled</span>`
+  : u.status === "FORCE_CHANGE_PASSWORD" ? `<span class="badge warning">Invited</span>`
+  : `<span class="badge good">Active</span>`;
+
+async function team() {
+  if (profile.role !== "owner") throw new Error("only owners can manage the team");
+  const users = await api("/users");
+  view.innerHTML = `
+    <div class="page-head">
+      <h1>Team <span class="muted small">${users.length}</span></h1>
+      <button class="primary" id="invite">Add team member</button>
+    </div>
+    <p class="muted">Staff use the back office. Owners also manage these accounts.</p>
+    <section class="card flush">
+      <table class="team"><thead><tr><th>Account</th><th>Role</th><th>Status</th><th>Added</th><th></th></tr></thead><tbody>
+        ${users.map((u) => `<tr>
+          <td>${esc(u.email)}${u.you ? ` <span class="muted small">(you)</span>` : ""}</td>
+          <td>${roleBadge(u.role)}</td>
+          <td>${accountStatus(u)}</td>
+          <td>${u.created_at ? dateTime(u.created_at) : ""}</td>
+          <td class="actions">${u.you ? "" : `
+            <button class="small" data-user="${esc(u.username)}" data-email="${esc(u.email)}" data-act="role" data-role="${u.role === "owner" ? "staff" : "owner"}">${u.role === "owner" ? "Make staff" : "Make owner"}</button>
+            <button class="small" data-user="${esc(u.username)}" data-email="${esc(u.email)}" data-act="${u.enabled ? "disable" : "enable"}">${u.enabled ? "Disable" : "Enable"}</button>
+            <button class="small danger-btn" data-user="${esc(u.username)}" data-email="${esc(u.email)}" data-act="remove">Remove</button>`}</td></tr>`).join("")}
+      </tbody></table>
+    </section>`;
+
+  $("#invite").addEventListener("click", inviteDialog);
+  view.querySelectorAll("[data-act]").forEach((b) =>
+    b.addEventListener("click", async () => {
+      const { user, email, act, role } = b.dataset;
+      const path = `/users/${encodeURIComponent(user)}`;
+      if (act === "remove" && !confirm(`Remove ${email}? They lose back-office access for good.`)) return;
+      if (act === "disable" && !confirm(`Disable ${email}? They are signed out and can't sign in until re-enabled.`)) return;
+      if (act === "role" && !confirm(`Make ${email} ${role === "owner" ? "an owner (can manage the team)" : "staff (no team management)"}?`)) return;
+      b.disabled = true;
+      try {
+        if (act === "remove") await api(path, { method: "DELETE" });
+        else await api(path, { method: "PATCH", body: act === "role" ? { role } : { enabled: act === "enable" } });
+        toast(`${email}: ${{ remove: "removed", disable: "disabled", enable: "enabled", role: `now ${role}` }[act]}`);
+        render();
+      } catch (e) {
+        toast(e.message, true);
+        b.disabled = false;
+      }
+    }),
+  );
+}
+
+function inviteDialog() {
+  dialog.innerHTML = `
+    <form class="stack" id="inviteForm">
+      <div class="dialog-head"><h2>Add team member</h2><button type="button" class="ghost" id="closeDialog" aria-label="Close">✕</button></div>
+      <label>Email <input type="email" name="email" required maxlength="254" autocomplete="off" autofocus></label>
+      <label>Role
+        <select name="role">
+          <option value="staff">Staff: orders, products, dashboard</option>
+          <option value="owner">Owner: staff + manage the team</option>
+        </select>
+      </label>
+      <p class="muted small">They receive an email with a temporary password and choose their own at first sign-in.</p>
+      <p id="inviteError" class="error" hidden></p>
+      <div class="dialog-actions"><button class="primary">Send invitation</button></div>
+    </form>`;
+  $("#closeDialog", dialog).addEventListener("click", () => dialog.close());
+  $("#inviteForm", dialog).addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const body = Object.fromEntries(new FormData(e.target));
+    try {
+      const user = await api("/users", { method: "POST", body });
+      dialog.close();
+      toast(`Invitation sent to ${user.email}`);
+      render();
+    } catch (err) {
+      $("#inviteError", dialog).textContent = err.message;
+      $("#inviteError", dialog).hidden = false;
+    }
+  });
+  dialog.showModal();
+}
+
 // --- Router -------------------------------------------------------------------
 async function render() {
   const [, section = "dashboard", id] = location.hash.split("/");
@@ -323,6 +409,7 @@ async function render() {
     if (section === "orders") await orders();
     else if (section === "products" && id) await productForm(id === "new" ? null : decodeURIComponent(id));
     else if (section === "products") await products();
+    else if (section === "team") await team();
     else await dashboard();
   } catch (e) {
     view.innerHTML = `<p class="error">Could not load this page: ${esc(e.message)}</p>`;
@@ -334,4 +421,12 @@ window.addEventListener("hashchange", render);
 
 const me = await session();
 $("#who").textContent = me.email ?? "";
+try {
+  profile = await api("/me");
+} catch {
+  // keep the least-privileged profile; pages report their own errors
+}
+$("#role").textContent = ROLE[profile.role]?.label ?? "";
+$("#role").className = `badge ${ROLE[profile.role]?.tone ?? ""}`;
+$('[data-nav="team"]').hidden = profile.role !== "owner";
 render();

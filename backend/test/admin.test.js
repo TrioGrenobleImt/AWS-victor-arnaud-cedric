@@ -5,14 +5,24 @@ import { test } from "node:test";
 import { createAdminApp } from "../admin/app.js";
 import { createApp } from "../api/app.js";
 import { getProduct } from "../lib/products.js";
+import { memoryDirectory } from "../dev/memory-directory.js";
 import { json, sent, serve, useTables } from "./helpers.js";
 
 useTables();
-const verify = async (token) => {
-  if (token !== "admin-token") throw new Error("invalid");
-  return { username: "alice", groups: ["admins"] };
+const IDENTITIES = {
+  "admin-token": { username: "alice", groups: ["admins", "owners"] },
+  "staff-token": { username: "sam", groups: ["admins"] },
 };
-const admin = serve(createAdminApp({ verify }));
+const verify = async (token) => {
+  if (!IDENTITIES[token]) throw new Error("invalid");
+  return IDENTITIES[token];
+};
+const directory = memoryDirectory([
+  { username: "alice", email: "alice@example.com", role: "owner" },
+  { username: "sam", email: "sam@example.com", role: "staff" },
+  { username: "olga", email: "olga@example.com", role: "owner" },
+]);
+const admin = serve(createAdminApp({ verify, directory }));
 const shop = serve(createApp());
 const AUTH = { Authorization: "Bearer admin-token" };
 const call = (path, method = "GET", body) => fetch(`${admin.url}/admin/api${path}`, json(method, body, AUTH));
@@ -26,7 +36,7 @@ test("health is public, everything else needs an admin token", async () => {
   const me = await call("/me");
   assert.equal(me.status, 200);
   assert.equal(me.headers.get("cache-control"), "no-store");
-  assert.deepEqual(await me.json(), { username: "alice", groups: ["admins"] });
+  assert.deepEqual(await me.json(), { username: "alice", groups: ["admins", "owners"], role: "owner" });
 });
 
 test("admins create products, validated", async () => {
@@ -128,4 +138,71 @@ test("dashboard sums this month's sales, excluding cancelled orders", async () =
   assert.ok(after.daily[today - 1].revenue >= 55.8);
   assert.equal(after.top_products[0].product_id, "p-001");
   assert.ok(after.low_stock.some((p) => p.id === "p-002")); // stock 3 <= 5
+});
+
+// --- Team management ------------------------------------------------------------
+const as = (token) => (path, method = "GET", body) => fetch(`${admin.url}/admin/api${path}`, json(method, body, { Authorization: `Bearer ${token}` }));
+const staff = as("staff-token");
+
+test("staff use the app but can't touch the team", async () => {
+  assert.deepEqual(await (await staff("/me")).json(), { username: "sam", groups: ["admins"], role: "staff" });
+  assert.equal((await staff("/products")).status, 200);
+  assert.equal((await staff("/users")).status, 403);
+  assert.equal((await staff("/users", "POST", { email: "x@example.com", role: "owner" })).status, 403);
+  assert.equal((await staff("/users/olga", "PATCH", { role: "staff" })).status, 403);
+  assert.equal((await staff("/users/olga", "DELETE")).status, 403);
+  assert.equal((await fetch(`${admin.url}/admin/api/users`)).status, 401);
+});
+
+test("owners list the team, flagging themselves", async () => {
+  const users = await (await call("/users")).json();
+  assert.deepEqual(users.map((u) => [u.email, u.role, u.you]), [
+    ["alice@example.com", "owner", true],
+    ["olga@example.com", "owner", false],
+    ["sam@example.com", "staff", false],
+  ]);
+});
+
+test("owners invite team members, validated", async () => {
+  const res = await call("/users", "POST", { email: "  New.Hire@Example.com ", role: "staff" });
+  assert.equal(res.status, 201);
+  const user = await res.json();
+  assert.equal(user.email, "new.hire@example.com");
+  assert.equal(user.role, "staff");
+  assert.equal(user.status, "FORCE_CHANGE_PASSWORD");
+  assert.deepEqual(directory.invitations, ["new.hire@example.com"]);
+
+  assert.equal((await call("/users", "POST", { email: "new.hire@example.com" })).status, 409);
+  assert.equal((await call("/users", "POST", { email: "not-an-email" })).status, 400);
+  assert.equal((await call("/users", "POST", { email: "a@example.com", role: "superuser" })).status, 400);
+  assert.equal((await call(`/users/${user.username}`, "DELETE")).status, 204);
+});
+
+test("owners change roles, disable and remove accounts", async () => {
+  const promoted = await (await call("/users/sam", "PATCH", { role: "owner" })).json();
+  assert.equal(promoted.role, "owner");
+  assert.equal((await call("/users/sam", "PATCH", { role: "staff", enabled: false })).status, 200);
+  const demoted = (await (await call("/users")).json()).find((u) => u.username === "sam");
+  assert.deepEqual([demoted.role, demoted.enabled], ["staff", false]);
+
+  assert.equal((await call("/users/sam", "PATCH", {})).status, 400);
+  assert.equal((await call("/users/sam", "PATCH", { role: "boss" })).status, 400);
+  assert.equal((await call("/users/sam", "PATCH", { enabled: "no" })).status, 400);
+  assert.equal((await call("/users/ghost", "PATCH", { role: "staff" })).status, 404);
+  assert.equal((await call("/users/ghost", "DELETE")).status, 404);
+
+  await call("/users/sam", "PATCH", { enabled: true });
+});
+
+test("owners can't lock themselves out, and a demoted owner loses team access at once", async () => {
+  assert.equal((await call("/users/alice", "PATCH", { role: "staff" })).status, 409);
+  assert.equal((await call("/users/alice", "PATCH", { enabled: false })).status, 409);
+  assert.equal((await call("/users/alice", "DELETE")).status, 409);
+
+  const olga = as("admin-token"); // alice stays owner; olga is demoted then can't use a stale owner token
+  IDENTITIES["olga-token"] = { username: "olga", groups: ["admins", "owners"] };
+  assert.equal((await as("olga-token")("/users")).status, 200);
+  await olga("/users/olga", "PATCH", { role: "staff" });
+  assert.equal((await as("olga-token")("/users")).status, 403);
+  assert.equal((await as("olga-token")("/products")).status, 200, "still a back-office user");
 });

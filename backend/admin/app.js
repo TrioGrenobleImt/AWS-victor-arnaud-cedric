@@ -1,13 +1,14 @@
 // Back-office API (Express), a separate ECS service behind the same ALB:
 // the listener routes /admin/api/* here. Every route but /health needs an
-// admin token (Cognito "admins" group).
+// admin token (Cognito "admins" group); /users needs the "owner" role too.
 import express from "express";
 import { STATUSES, eventPayload, getOrder, listOrders, publish, setStatus } from "../lib/orders.js";
 import { addStock, createProduct, listProducts, updateProduct } from "../lib/products.js";
 import { currentMonth, monthlySales } from "../lib/sales.js";
 import { presignDocument, presignImageUpload } from "../lib/uploads.js";
-import { requireAdmin } from "./auth.js";
+import { ROLES, requireAdmin, requireOwner } from "./auth.js";
 
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MONTH = /^\d{4}-(0[1-9]|1[0-2])$/;
 const NOTIFY = {
   PACKED: (o) => [`Order ${o.order_id.slice(0, 8)} packed`, `Hello ${o.customer_name},\n\nYour order ${o.order_id} is packed and will ship soon.\n`],
@@ -21,7 +22,7 @@ function month(req) {
   return value;
 }
 
-export function createAdminApp({ verify }) {
+export function createAdminApp({ verify, directory }) {
   const app = express();
   app.disable("x-powered-by");
   app.use(express.json({ limit: "32kb" }));
@@ -86,6 +87,48 @@ export function createAdminApp({ verify }) {
     await publish(`ORDER_${status}`, subject, { default: eventPayload(`ORDER_${status}`, order), email: message });
     res.json(order);
   });
+
+  // --- Team (owners only) ---------------------------------------------------------
+  const team = express.Router();
+  team.use(requireOwner(directory));
+
+  // Mutations target an existing back-office user, never the caller: an owner
+  // can't lock themselves out, so there is always at least one owner left.
+  const target = async (req, res, next) => {
+    if (req.params.username === req.admin.username) return res.status(409).json({ error: "you can't change your own account" });
+    req.target = await directory.get(req.params.username);
+    if (!req.target) return res.status(404).json({ error: "user not found" });
+    next();
+  };
+
+  team.get("/", async (req, res) => res.json((await directory.list()).map((u) => ({ ...u, you: u.username === req.admin.username }))));
+
+  team.post("/", async (req, res) => {
+    const email = String(req.body?.email ?? "").trim().toLowerCase();
+    const role = req.body?.role ?? "staff";
+    if (!EMAIL.test(email) || email.length > 254) return res.status(400).json({ error: "a valid email is required" });
+    if (!ROLES.includes(role)) return res.status(400).json({ error: `role must be one of ${ROLES.join(", ")}` });
+    const user = await directory.create({ email, role });
+    if (!user) return res.status(409).json({ error: "an account with this email already exists" });
+    res.status(201).json(user);
+  });
+
+  team.patch("/:username", target, async (req, res) => {
+    const { role, enabled } = req.body ?? {};
+    if (role === undefined && enabled === undefined) return res.status(400).json({ error: "role or enabled is required" });
+    if (role !== undefined && !ROLES.includes(role)) return res.status(400).json({ error: `role must be one of ${ROLES.join(", ")}` });
+    if (enabled !== undefined && typeof enabled !== "boolean") return res.status(400).json({ error: "enabled must be true or false" });
+    if (role !== undefined && role !== req.target.role) await directory.setRole(req.target.username, role);
+    if (enabled !== undefined && enabled !== req.target.enabled) await directory.setEnabled(req.target.username, enabled);
+    res.json(await directory.get(req.target.username));
+  });
+
+  team.delete("/:username", target, async (req, res) => {
+    await directory.remove(req.target.username);
+    res.status(204).end();
+  });
+
+  api.use("/users", team);
 
   app.use("/admin/api", api);
   app.use((req, res) => res.status(404).json({ error: "not found" }));
