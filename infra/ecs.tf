@@ -162,7 +162,36 @@ resource "aws_ecs_cluster_capacity_providers" "main" {
   }
 }
 
-# --- Shop API: task definition + service ---------------------------------------
+# --- Services: shop API + admin API (same image, different entry point) -------
+locals {
+  common_env = {
+    AWS_REGION     = var.region
+    PRODUCTS_TABLE = aws_dynamodb_table.products.name
+    ORDERS_TABLE   = aws_dynamodb_table.orders.name
+    TOPIC_ARN      = aws_sns_topic.orders.arn
+  }
+
+  services = {
+    shop-api = {
+      command       = ["node", "api/server.js"]
+      desired_count = var.api_desired_count
+      environment   = local.common_env
+      policy        = data.aws_iam_policy_document.shop_task.json
+    }
+    admin-api = {
+      command       = ["node", "admin/server.js"]
+      desired_count = var.admin_desired_count
+      environment = merge(local.common_env, {
+        USER_POOL_ID        = aws_cognito_user_pool.admin.id
+        USER_POOL_CLIENT_ID = aws_cognito_user_pool_client.backoffice.id
+        IMAGES_BUCKET       = aws_s3_bucket.images.id
+        DOCUMENTS_BUCKET    = aws_s3_bucket.documents.id
+      })
+      policy = data.aws_iam_policy_document.admin_task.json
+    }
+  }
+}
+
 data "aws_iam_policy_document" "ecs_tasks_assume" {
   statement {
     actions = ["sts:AssumeRole"]
@@ -174,31 +203,28 @@ data "aws_iam_policy_document" "ecs_tasks_assume" {
 }
 
 # Used by the ECS agent: pull the image from ECR, write logs.
-resource "aws_iam_role" "api_execution" {
-  name               = "${var.project}-api-execution"
+resource "aws_iam_role" "task_execution" {
+  name               = "${var.project}-task-execution"
   assume_role_policy = data.aws_iam_policy_document.ecs_tasks_assume.json
 }
 
-resource "aws_iam_role_policy_attachment" "api_execution" {
-  role       = aws_iam_role.api_execution.name
+resource "aws_iam_role_policy_attachment" "task_execution" {
+  role       = aws_iam_role.task_execution.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
 }
 
-# Used by the application code (least privilege).
-resource "aws_iam_role" "api_task" {
-  name               = "${var.project}-api-task"
-  assume_role_policy = data.aws_iam_policy_document.ecs_tasks_assume.json
-}
-
-data "aws_iam_policy_document" "api_task" {
+# Used by the application code: one least-privilege role per service.
+data "aws_iam_policy_document" "shop_task" {
   source_policy_documents = [data.aws_iam_policy_document.sns_kms.json]
 
   statement {
-    actions   = ["dynamodb:Scan", "dynamodb:BatchGetItem", "dynamodb:GetItem"]
+    sid       = "ReadCatalogTakeStock"
+    actions   = ["dynamodb:Scan", "dynamodb:BatchGetItem", "dynamodb:GetItem", "dynamodb:UpdateItem"]
     resources = [aws_dynamodb_table.products.arn]
   }
   statement {
-    actions   = ["dynamodb:PutItem", "dynamodb:GetItem", "dynamodb:UpdateItem"]
+    sid       = "PlaceAndTrackOrders"
+    actions   = ["dynamodb:PutItem", "dynamodb:GetItem"]
     resources = [aws_dynamodb_table.orders.arn]
   }
   statement {
@@ -207,44 +233,78 @@ data "aws_iam_policy_document" "api_task" {
   }
 }
 
-resource "aws_iam_role_policy" "api_task" {
-  name   = "permissions"
-  role   = aws_iam_role.api_task.id
-  policy = data.aws_iam_policy_document.api_task.json
+data "aws_iam_policy_document" "admin_task" {
+  source_policy_documents = [data.aws_iam_policy_document.sns_kms.json]
+
+  statement {
+    sid       = "ManageCatalog"
+    actions   = ["dynamodb:Scan", "dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:UpdateItem"]
+    resources = [aws_dynamodb_table.products.arn]
+  }
+  statement {
+    sid       = "ManageOrders"
+    actions   = ["dynamodb:GetItem", "dynamodb:UpdateItem", "dynamodb:Query"]
+    resources = [aws_dynamodb_table.orders.arn, "${aws_dynamodb_table.orders.arn}/index/by_month"]
+  }
+  statement {
+    sid       = "PresignCoverUploads" # presigned POSTs carry the task role's permission
+    actions   = ["s3:PutObject"]
+    resources = ["${aws_s3_bucket.images.arn}/images/uploads/*"]
+  }
+  statement {
+    sid       = "PresignPackingSlips"
+    actions   = ["s3:GetObject"]
+    resources = ["${aws_s3_bucket.documents.arn}/packing-slips/*"]
+  }
+  statement {
+    actions   = ["sns:Publish"]
+    resources = [aws_sns_topic.orders.arn]
+  }
 }
 
-resource "aws_cloudwatch_log_group" "api" {
-  name              = "/ecs/${var.project}/shop-api"
+resource "aws_iam_role" "task" {
+  for_each           = local.services
+  name               = "${var.project}-${each.key}-task"
+  assume_role_policy = data.aws_iam_policy_document.ecs_tasks_assume.json
+}
+
+resource "aws_iam_role_policy" "task" {
+  for_each = local.services
+  name     = "permissions"
+  role     = aws_iam_role.task[each.key].id
+  policy   = each.value.policy
+}
+
+resource "aws_cloudwatch_log_group" "service" {
+  for_each          = local.services
+  name              = "/ecs/${var.project}/${each.key}"
   retention_in_days = var.log_retention_days
 }
 
-resource "aws_ecs_task_definition" "api" {
-  family                   = "${var.project}-shop-api"
+resource "aws_ecs_task_definition" "service" {
+  for_each                 = local.services
+  family                   = "${var.project}-${each.key}"
   requires_compatibilities = ["EC2"]
   network_mode             = "bridge"
-  execution_role_arn       = aws_iam_role.api_execution.arn
-  task_role_arn            = aws_iam_role.api_task.arn
+  execution_role_arn       = aws_iam_role.task_execution.arn
+  task_role_arn            = aws_iam_role.task[each.key].arn
 
   container_definitions = jsonencode([{
-    name              = "api"
+    name              = "app"
     image             = local.api_image
+    command           = each.value.command
     essential         = true
     cpu               = 256
-    memoryReservation = 128 # soft limit: 4 tasks still fit on a t3.micro during deployments
+    memoryReservation = 128 # soft limit: every task + a deployment surge fit on a t3.micro
     memory            = 256 # hard limit
     portMappings      = [{ containerPort = 8080, hostPort = 0, protocol = "tcp" }]
-    environment = [
-      { name = "AWS_REGION", value = var.region },
-      { name = "PRODUCTS_TABLE", value = aws_dynamodb_table.products.name },
-      { name = "ORDERS_TABLE", value = aws_dynamodb_table.orders.name },
-      { name = "TOPIC_ARN", value = aws_sns_topic.orders.arn },
-    ]
+    environment       = [for k, v in each.value.environment : { name = k, value = v }]
     logConfiguration = {
       logDriver = "awslogs"
       options = {
-        awslogs-group         = aws_cloudwatch_log_group.api.name
+        awslogs-group         = aws_cloudwatch_log_group.service[each.key].name
         awslogs-region        = var.region
-        awslogs-stream-prefix = "api"
+        awslogs-stream-prefix = each.key
       }
     }
   }])
@@ -252,11 +312,12 @@ resource "aws_ecs_task_definition" "api" {
   depends_on = [terraform_data.api_image]
 }
 
-resource "aws_ecs_service" "api" {
-  name                               = "shop-api"
+resource "aws_ecs_service" "service" {
+  for_each                           = local.services
+  name                               = each.key
   cluster                            = aws_ecs_cluster.main.id
-  task_definition                    = aws_ecs_task_definition.api.arn
-  desired_count                      = var.api_desired_count
+  task_definition                    = aws_ecs_task_definition.service[each.key].arn
+  desired_count                      = each.value.desired_count
   deployment_minimum_healthy_percent = 50
   deployment_maximum_percent         = 200
   health_check_grace_period_seconds  = 30
@@ -277,8 +338,8 @@ resource "aws_ecs_service" "api" {
   }
 
   load_balancer {
-    target_group_arn = aws_lb_target_group.api.arn
-    container_name   = "api"
+    target_group_arn = aws_lb_target_group.service[each.key].arn
+    container_name   = "app"
     container_port   = 8080
   }
 
@@ -288,16 +349,16 @@ resource "aws_ecs_service" "api" {
   }
 
   lifecycle {
-    ignore_changes = [desired_count] # driven by Application Auto Scaling
+    ignore_changes = [desired_count] # shop-api: driven by Application Auto Scaling
   }
 
-  depends_on = [aws_lb_listener.http, aws_ecs_cluster_capacity_providers.main]
+  depends_on = [aws_lb_listener.http, aws_lb_listener_rule.admin, aws_ecs_cluster_capacity_providers.main]
 }
 
-# --- Task auto scaling on CPU ---------------------------------------------------
+# --- Shop API auto scaling on CPU ------------------------------------------------
 resource "aws_appautoscaling_target" "api" {
   service_namespace  = "ecs"
-  resource_id        = "service/${aws_ecs_cluster.main.name}/${aws_ecs_service.api.name}"
+  resource_id        = "service/${aws_ecs_cluster.main.name}/${aws_ecs_service.service["shop-api"].name}"
   scalable_dimension = "ecs:service:DesiredCount"
   min_capacity       = var.api_desired_count
   max_capacity       = var.api_max_count

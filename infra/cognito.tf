@@ -1,0 +1,98 @@
+# --- Back-office sign-in: Cognito user pool (Lite tier, free up to 10k MAU) ----
+# Admins are created by Terraform (or in the console) and must be in the
+# "admins" group; there is no self sign-up. The SPA uses the Cognito hosted
+# login page (authorization code + PKCE) and the admin API verifies the access
+# tokens (signature, expiry, client id, group).
+locals {
+  backoffice_url = "https://${aws_cloudfront_distribution.main.domain_name}/admin/"
+}
+
+resource "aws_cognito_user_pool" "admin" {
+  name                = "${var.project}-admin"
+  user_pool_tier      = "LITE"
+  username_attributes = ["email"]
+  deletion_protection = "INACTIVE"
+
+  admin_create_user_config {
+    allow_admin_create_user_only = true
+
+    invite_message_template {
+      email_subject = "FISA Records back office access"
+      email_message = "Your back-office username is {username} and your temporary password is {####}. Sign in at ${local.backoffice_url}"
+      sms_message   = "Username {username}, temporary password {####}"
+    }
+  }
+
+  password_policy {
+    minimum_length                   = 12
+    require_lowercase                = true
+    require_uppercase                = true
+    require_numbers                  = true
+    require_symbols                  = false
+    temporary_password_validity_days = 7
+  }
+
+  account_recovery_setting {
+    recovery_mechanism {
+      name     = "verified_email"
+      priority = 1
+    }
+  }
+}
+
+resource "aws_cognito_user_pool_domain" "admin" {
+  domain                = "${var.project}-admin-${data.aws_caller_identity.current.account_id}"
+  user_pool_id          = aws_cognito_user_pool.admin.id
+  managed_login_version = 1 # classic hosted UI, available on the Lite tier
+}
+
+resource "aws_cognito_user_pool_client" "backoffice" {
+  name         = "backoffice"
+  user_pool_id = aws_cognito_user_pool.admin.id
+
+  generate_secret                      = false # public SPA client, protected by PKCE
+  allowed_oauth_flows_user_pool_client = true
+  allowed_oauth_flows                  = ["code"]
+  allowed_oauth_scopes                 = ["openid", "email", "profile"]
+  supported_identity_providers         = ["COGNITO"]
+  callback_urls                        = [local.backoffice_url]
+  logout_urls                          = [local.backoffice_url]
+
+  # ADMIN_USER_PASSWORD_AUTH lets tests/test.sh get a token with IAM credentials.
+  explicit_auth_flows           = ["ALLOW_REFRESH_TOKEN_AUTH", "ALLOW_ADMIN_USER_PASSWORD_AUTH"]
+  prevent_user_existence_errors = "ENABLED"
+  access_token_validity         = 60
+  id_token_validity             = 60
+  refresh_token_validity        = 1
+  token_validity_units {
+    access_token  = "minutes"
+    id_token      = "minutes"
+    refresh_token = "days"
+  }
+}
+
+resource "aws_cognito_user_group" "admins" {
+  name         = "admins"
+  user_pool_id = aws_cognito_user_pool.admin.id
+  description  = "Back-office administrators"
+}
+
+# First admin: Cognito emails a temporary password, changed at first sign-in.
+resource "aws_cognito_user" "admin" {
+  count                    = var.admin_email != "" ? 1 : 0
+  user_pool_id             = aws_cognito_user_pool.admin.id
+  username                 = var.admin_email
+  desired_delivery_mediums = ["EMAIL"]
+
+  attributes = {
+    email          = var.admin_email
+    email_verified = true
+  }
+}
+
+resource "aws_cognito_user_in_group" "admin" {
+  count        = var.admin_email != "" ? 1 : 0
+  user_pool_id = aws_cognito_user_pool.admin.id
+  group_name   = aws_cognito_user_group.admins.name
+  username     = aws_cognito_user.admin[0].username
+}

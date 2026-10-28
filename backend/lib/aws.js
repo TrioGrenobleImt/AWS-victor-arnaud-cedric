@@ -5,11 +5,13 @@ import { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
 import { S3Client } from "@aws-sdk/client-s3";
 import { SNSClient } from "@aws-sdk/client-sns";
 
-export const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({}), {
+// DYNAMODB_ENDPOINT points at DynamoDB Local for tests / local development.
+export const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({ endpoint: process.env.DYNAMODB_ENDPOINT }), {
   marshallOptions: { removeUndefinedValues: true },
 });
 export const sns = new SNSClient({});
-export const s3 = new S3Client({});
+// S3_ENDPOINT points at the local S3 stand-in of `npm run dev` (path-style URLs).
+export const s3 = new S3Client({ endpoint: process.env.S3_ENDPOINT, forcePathStyle: Boolean(process.env.S3_ENDPOINT) });
 
 export function env(name) {
   const value = process.env[name];

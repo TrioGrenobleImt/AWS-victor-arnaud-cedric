@@ -2,16 +2,19 @@
 # End-to-end scenario. Run from the repository root after `terraform -chdir=infra apply`.
 #   1. load balancing   : /api/health answered by several ECS tasks
 #   2. catalog + image  : CloudFront -> ALB -> ECS -> DynamoDB, image via CloudFront -> S3
-#   3. order            : POST /api/orders -> immediate confirmation + SNS event
-#   4. async processing : SNS -> SQS -> Lambda, status PENDING -> PACKING -> SHIPPED
-#   5. audit streaming  : DynamoDB Stream -> Lambda -> S3 audit documents
-#   6. validation       : bad order rejected with 400
+#   3. order            : POST /api/orders -> immediate confirmation + SNS event, stock taken
+#   4. async processing : SNS -> SQS -> Lambda writes the packing slip (documents bucket)
+#   5. back office      : admin API (Cognito token) moves ORDERED -> PACKED -> SHIPPED
+#                         needs ADMIN_EMAIL + ADMIN_PASSWORD of a confirmed admin, skipped otherwise
+#   6. audit streaming  : DynamoDB Stream -> Lambda -> S3 audit documents
+#   7. validation       : bad order rejected with 400, admin API rejects anonymous calls
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
 tf() { terraform -chdir=infra output -raw "$1"; }
 BASE_URL="${BASE_URL:-$(tf base_url)}"
 AUDIT_BUCKET=$(tf audit_bucket)
+DOCUMENTS_BUCKET=$(tf documents_bucket)
 echo "Target: $BASE_URL"
 
 echo -e "\n== 1. Load balancing (6 calls) =="
@@ -31,20 +34,39 @@ ORDER=$(curl -sf -X POST "$BASE_URL/api/orders" -H 'Content-Type: application/js
 echo "$ORDER" | jq .
 ORDER_ID=$(echo "$ORDER" | jq -r .order_id)
 
-echo -e "\n== 4. Asynchronous processing =="
-for _ in $(seq 20); do
-  STATUS=$(curl -sf "$BASE_URL/api/orders/$ORDER_ID" | jq -r .status)
-  echo "status: $STATUS"
-  [ "$STATUS" = "SHIPPED" ] && break
+echo -e "\n== 4. Asynchronous processing: packing slip =="
+for _ in $(seq 15); do
+  SLIP=$(curl -sf "$BASE_URL/api/orders/$ORDER_ID" | jq -r '.packing_slip // empty')
+  [ -n "$SLIP" ] && break
   sleep 2
 done
+echo "packing slip: ${SLIP:-none}"
+[ -n "$SLIP" ] && aws s3 cp "s3://$DOCUMENTS_BUCKET/$SLIP" -
+
+echo -e "\n== 5. Back office: ORDERED -> PACKED -> SHIPPED =="
+STATUS=$(curl -sf "$BASE_URL/api/orders/$ORDER_ID" | jq -r .status)
+if [ -n "${ADMIN_EMAIL:-}" ] && [ -n "${ADMIN_PASSWORD:-}" ]; then
+  TOKEN=$(aws cognito-idp admin-initiate-auth --user-pool-id "$(tf user_pool_id)" --client-id "$(tf user_pool_client_id)" \
+    --auth-flow ADMIN_USER_PASSWORD_AUTH --auth-parameters "USERNAME=$ADMIN_EMAIL,PASSWORD=$ADMIN_PASSWORD" \
+    --query AuthenticationResult.AccessToken --output text)
+  admin() { curl -sf -X POST "$BASE_URL/admin/api/orders/$ORDER_ID/status" -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d "$1"; }
+  admin '{"status": "PACKED"}' | jq -c '{status}'
+  admin '{"status": "SHIPPED", "tracking_number": "TEST-123"}' | jq -c '{status, tracking_number}'
+  curl -sf "$BASE_URL/admin/api/dashboard" -H "Authorization: Bearer $TOKEN" | jq -c '{month, revenue, orders, by_status}'
+  STATUS=$(curl -sf "$BASE_URL/api/orders/$ORDER_ID" | jq -r .status)
+else
+  echo "(skipped: set ADMIN_EMAIL and ADMIN_PASSWORD to drive the admin API)"
+fi
 curl -sf "$BASE_URL/api/orders/$ORDER_ID" | jq '{order_id, status, total, history}'
 
-echo -e "\n== 5. Audit trail in S3 (DynamoDB Stream) =="
+echo -e "\n== 6. Audit trail in S3 (DynamoDB Stream) =="
 sleep 10
 aws s3 ls "s3://$AUDIT_BUCKET/orders/" --recursive | grep "$ORDER_ID" || echo "(no audit document yet, retry in a few seconds)"
 
-echo -e "\n== 6. Validation error is rejected =="
-curl -s -o /dev/null -w 'HTTP %{http_code}\n' -X POST "$BASE_URL/api/orders" -H 'Content-Type: application/json' -d '{"items": []}'
+echo -e "\n== 7. Validation and access control =="
+curl -s -o /dev/null -w 'bad order:          HTTP %{http_code}\n' -X POST "$BASE_URL/api/orders" -H 'Content-Type: application/json' -d '{"items": []}'
+curl -s -o /dev/null -w 'anonymous admin:    HTTP %{http_code}\n' "$BASE_URL/admin/api/orders"
+curl -s -o /dev/null -w 'back office page:   HTTP %{http_code}\n' "$BASE_URL/admin/"
 
-[ "$STATUS" = "SHIPPED" ] && echo -e "\nPASS" || { echo -e "\nFAIL: order not shipped"; exit 1; }
+EXPECTED=$([ -n "${ADMIN_PASSWORD:-}" ] && echo SHIPPED || echo ORDERED)
+[ -n "$SLIP" ] && [ "$STATUS" = "$EXPECTED" ] && echo -e "\nPASS" || { echo -e "\nFAIL: status $STATUS (expected $EXPECTED), packing slip ${SLIP:-missing}"; exit 1; }

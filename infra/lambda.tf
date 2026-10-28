@@ -5,11 +5,11 @@
 locals {
   functions = {
     order-processor = {
-      description = "SQS consumer: packing + shipping simulation"
-      timeout     = 30
+      description = "SQS consumer: writes the packing slip of each new order"
+      timeout     = 15
       environment = {
-        ORDERS_TABLE = aws_dynamodb_table.orders.name
-        TOPIC_ARN    = aws_sns_topic.orders.arn
+        ORDERS_TABLE     = aws_dynamodb_table.orders.name
+        DOCUMENTS_BUCKET = aws_s3_bucket.documents.id
       }
     }
     audit-stream = {
@@ -78,8 +78,6 @@ resource "aws_iam_role_policy_attachment" "lambda_xray" {
 }
 
 data "aws_iam_policy_document" "order_processor" {
-  source_policy_documents = [data.aws_iam_policy_document.sns_kms.json]
-
   statement {
     actions   = ["sqs:ReceiveMessage", "sqs:DeleteMessage", "sqs:GetQueueAttributes"]
     resources = [aws_sqs_queue.orders.arn]
@@ -89,8 +87,8 @@ data "aws_iam_policy_document" "order_processor" {
     resources = [aws_dynamodb_table.orders.arn]
   }
   statement {
-    actions   = ["sns:Publish"]
-    resources = [aws_sns_topic.orders.arn]
+    actions   = ["s3:PutObject"]
+    resources = ["${aws_s3_bucket.documents.arn}/packing-slips/*"]
   }
 }
 

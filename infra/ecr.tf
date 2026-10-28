@@ -1,5 +1,5 @@
 # --- Container registry + image build ----------------------------------------
-# The shop API image is built locally (Docker) and pushed to ECR during apply.
+# The API image (shop + admin entry points) is built locally (Docker) and pushed to ECR during apply.
 # The tag is a hash of the backend sources, so any code change produces a new
 # image, a new task definition revision and a rolling ECS deployment.
 locals {
@@ -7,6 +7,7 @@ locals {
   backend_files = sort(setunion(
     fileset(local.backend_dir, "{package.json,package-lock.json,Dockerfile}"),
     fileset(local.backend_dir, "api/**"),
+    fileset(local.backend_dir, "admin/**"),
     fileset(local.backend_dir, "lib/**"),
   ))
   api_image_tag = substr(sha1(join("", [for f in local.backend_files : filesha1("${local.backend_dir}/${f}")])), 0, 12)

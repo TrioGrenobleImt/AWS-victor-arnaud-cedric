@@ -16,6 +16,12 @@ variable "notification_email" {
   default     = ""
 }
 
+variable "admin_email" {
+  description = "Email of the first back-office admin (Cognito sends a temporary password). Leave empty to create admins later."
+  type        = string
+  default     = ""
+}
+
 # --- Account guardrails -------------------------------------------------------
 variable "monthly_budget_usd" {
   description = "Monthly cost budget. Alerts fire at 80% (actual) and 100% (forecast). Needs notification_email."
@@ -57,6 +63,12 @@ variable "api_desired_count" {
   description = "Shop API tasks. 2 tasks keep the API up while one is replaced (both fit on one t3.micro)."
   type        = number
   default     = 2
+}
+
+variable "admin_desired_count" {
+  description = "Admin API tasks (internal traffic only)."
+  type        = number
+  default     = 1
 }
 
 variable "api_max_count" {

@@ -1,5 +1,6 @@
-# Event model: the API publishes on SNS, which fans out to SQS (processing
-# Lambda) and to email subscribers.
+# Event model: the APIs publish on SNS (ORDER_PLACED from the shop; ORDER_PACKED,
+# ORDER_SHIPPED, ORDER_CANCELLED from the back office), which fans out to email
+# subscribers and, for ORDER_PLACED only, to SQS -> order-processor Lambda.
 resource "aws_sns_topic" "orders" {
   name              = "${var.project}-order-events"
   kms_master_key_id = "alias/aws/sns"
@@ -13,7 +14,7 @@ resource "aws_sqs_queue" "orders_dlq" {
 
 resource "aws_sqs_queue" "orders" {
   name                       = "${var.project}-order-processing"
-  visibility_timeout_seconds = 180 # >= 6x the processor Lambda timeout
+  visibility_timeout_seconds = 90 # >= 6x the processor Lambda timeout
   receive_wait_time_seconds  = 20
   sqs_managed_sse_enabled    = true
 

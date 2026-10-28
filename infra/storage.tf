@@ -2,8 +2,11 @@ locals {
   # Vite build output: run `npm ci && npm run build` in frontend/ before apply.
   frontend_dir   = "${path.module}/../frontend/dist"
   frontend_files = fileset(local.frontend_dir, "**")
-  image_dir      = "${path.module}/../images"
-  image_files    = fileset(local.image_dir, "covers/**")
+  # Back office build, served under /admin/ from the same bucket.
+  backoffice_dir   = "${path.module}/../backoffice/dist"
+  backoffice_files = fileset(local.backoffice_dir, "**")
+  image_dir        = "${path.module}/../images"
+  image_files      = fileset(local.image_dir, "covers/**")
 
   content_types = {
     html  = "text/html; charset=utf-8"
@@ -31,6 +34,10 @@ resource "aws_s3_bucket" "web" {
       condition     = contains(local.frontend_files, "index.html")
       error_message = "Frontend not built: run `npm ci && npm run build` in frontend/ first."
     }
+    precondition {
+      condition     = contains(local.backoffice_files, "index.html")
+      error_message = "Back office not built: run `npm ci && npm run build` in backoffice/ first."
+    }
   }
 }
 
@@ -55,6 +62,30 @@ resource "aws_s3_object" "web" {
 }
 
 
+resource "aws_s3_object" "backoffice" {
+  for_each      = local.backoffice_files
+  bucket        = aws_s3_bucket.web.id
+  key           = "admin/${each.value}"
+  source        = "${local.backoffice_dir}/${each.value}"
+  etag          = filemd5("${local.backoffice_dir}/${each.value}")
+  content_type  = lookup(local.content_types, lower(regex("[^.]+$", each.value)), "application/octet-stream")
+  cache_control = startswith(each.value, "assets/") ? "public, max-age=31536000, immutable" : "no-cache"
+}
+
+# Runtime settings of the back office (Cognito hosted login).
+resource "aws_s3_object" "backoffice_config" {
+  bucket        = aws_s3_bucket.web.id
+  key           = "admin/config.json"
+  content_type  = "application/json"
+  cache_control = "no-cache"
+  content = jsonencode({
+    auth        = "cognito"
+    domain      = "${aws_cognito_user_pool_domain.admin.domain}.auth.${var.region}.amazoncognito.com"
+    clientId    = aws_cognito_user_pool_client.backoffice.id
+    redirectUri = local.backoffice_url
+  })
+}
+
 # --- Product images (private bucket, served by CloudFront under /images/*) --
 resource "aws_s3_bucket" "images" {
   bucket        = "${var.project}-images-${data.aws_caller_identity.current.account_id}"
@@ -67,6 +98,19 @@ resource "aws_s3_bucket_public_access_block" "images" {
   block_public_policy     = true
   ignore_public_acls      = true
   restrict_public_buckets = true
+}
+
+# The back office uploads covers straight from the browser (presigned POST,
+# images/uploads/*), so the bucket accepts cross-origin POSTs from the site.
+resource "aws_s3_bucket_cors_configuration" "images" {
+  bucket = aws_s3_bucket.images.id
+
+  cors_rule {
+    allowed_methods = ["POST"]
+    allowed_origins = ["https://${aws_cloudfront_distribution.main.domain_name}"]
+    allowed_headers = ["*"]
+    max_age_seconds = 3600
+  }
 }
 
 resource "aws_s3_object" "images" {
@@ -108,6 +152,34 @@ resource "aws_s3_bucket_policy" "images" {
   bucket     = aws_s3_bucket.images.id
   policy     = data.aws_iam_policy_document.cloudfront_read["images"].json
   depends_on = [aws_s3_bucket_public_access_block.images]
+}
+
+# --- Internal documents: packing slips (written by the order-processor Lambda,
+# opened by admins through short-lived presigned links) ----------------------
+resource "aws_s3_bucket" "documents" {
+  bucket        = "${var.project}-documents-${data.aws_caller_identity.current.account_id}"
+  force_destroy = true
+}
+
+resource "aws_s3_bucket_public_access_block" "documents" {
+  bucket                  = aws_s3_bucket.documents.id
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+resource "aws_s3_bucket_lifecycle_configuration" "documents" {
+  bucket = aws_s3_bucket.documents.id
+
+  rule {
+    id     = "expire-packing-slips"
+    status = "Enabled"
+    filter {}
+    expiration {
+      days = 90
+    }
+  }
 }
 
 # --- Audit / reporting data lake (written by the stream Lambda) -------------

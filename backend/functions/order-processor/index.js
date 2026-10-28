@@ -1,34 +1,41 @@
-// SQS consumer: simulates packing and shipping for each ORDER_PLACED event,
-// updates the order in DynamoDB and publishes ORDER_SHIPPED (email only).
-import { InvalidTransitionError, publish, setStatus } from "../../lib/orders.js";
+// SQS consumer for ORDER_PLACED events: prepares the warehouse work by writing
+// a packing slip to the documents bucket and linking it to the order. Packing
+// and shipping are then confirmed by an admin in the back office.
+import { PutObjectCommand } from "@aws-sdk/client-s3";
+import { env, s3 } from "../../lib/aws.js";
+import { annotateOrder } from "../../lib/orders.js";
 
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-const randomInt = (min, max) => min + Math.floor(Math.random() * (max - min));
-
-async function processOrder(event, source) {
-  const { order_id: orderId, customer_name: name, items } = event;
-  try {
-    await setStatus(orderId, "PACKING", `packing ${items.reduce((n, i) => n + i.quantity, 0)} item(s)`, source);
-    await sleep(randomInt(2000, 4000));
-    const tracking = `TRK${randomInt(1e8, 1e9)}`;
-    await setStatus(orderId, "SHIPPED", `shipped with tracking number ${tracking}`, source);
-    await publish(
-      "ORDER_SHIPPED",
-      `Order ${orderId.slice(0, 8)} shipped`,
-      `Hello ${name},\n\nYour order ${orderId} has shipped. Tracking: ${tracking}\n`,
-    );
-  } catch (err) {
-    // Cancelled (or already processed) meanwhile: nothing to do, don't retry.
-    if (err instanceof InvalidTransitionError) return console.log(JSON.stringify({ order_id: orderId, skipped: err.message }));
-    throw err;
-  }
+export function packingSlip({ order_id: orderId, customer_name: name, customer_email: email, items, total }) {
+  const width = Math.max(...items.map((i) => i.name.length), 20);
+  return [
+    "FISA Records — packing slip",
+    "",
+    `Order    ${orderId}`,
+    `Customer ${name} <${email}>`,
+    "",
+    `${"Qty".padEnd(5)}${"Record".padEnd(width + 2)}Product`,
+    ...items.map((i) => `${String(i.quantity).padEnd(5)}${i.name.padEnd(width + 2)}${i.product_id}`),
+    "",
+    `Items: ${items.reduce((n, i) => n + i.quantity, 0)}    Total: ${Number(total).toFixed(2)} EUR`,
+    "",
+  ].join("\n");
 }
 
-export async function handler(event, context) {
+async function processOrder(event) {
+  const key = `packing-slips/${event.order_id}.txt`;
+  // Plain text on purpose: the slip contains customer input and is opened in a browser.
+  await s3.send(
+    new PutObjectCommand({ Bucket: env("DOCUMENTS_BUCKET"), Key: key, Body: packingSlip(event), ContentType: "text/plain; charset=utf-8" }),
+  );
+  await annotateOrder(event.order_id, { packing_slip: key });
+  console.log(JSON.stringify({ order_id: event.order_id, packing_slip: key }));
+}
+
+export async function handler(event) {
   const batchItemFailures = [];
   for (const record of event.Records) {
     try {
-      await processOrder(JSON.parse(record.body), context.functionName);
+      await processOrder(JSON.parse(record.body));
     } catch (err) {
       // retried, then sent to the DLQ after 3 attempts
       console.error(`failed ${record.messageId}`, err);

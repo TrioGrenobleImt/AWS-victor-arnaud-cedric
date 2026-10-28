@@ -59,7 +59,7 @@ resource "aws_cloudwatch_metric_alarm" "api_unhealthy_tasks" {
   alarm_description   = "At least one shop API task fails the ALB health check"
   namespace           = "AWS/ApplicationELB"
   metric_name         = "UnHealthyHostCount"
-  dimensions          = { LoadBalancer = aws_lb.api.arn_suffix, TargetGroup = aws_lb_target_group.api.arn_suffix }
+  dimensions          = { LoadBalancer = aws_lb.api.arn_suffix, TargetGroup = aws_lb_target_group.service["shop-api"].arn_suffix }
   statistic           = "Maximum"
   period              = 60
   evaluation_periods  = 3
@@ -76,12 +76,11 @@ resource "aws_cloudwatch_dashboard" "main" {
       {
         type = "metric", x = 0, y = 0, width = 12, height = 6
         properties = {
-          title  = "Shop API (ECS) CPU / memory %"
+          title  = "ECS services CPU %"
           region = var.region
           stat   = "Average"
           metrics = [
-            ["AWS/ECS", "CPUUtilization", "ClusterName", aws_ecs_cluster.main.name, "ServiceName", aws_ecs_service.api.name],
-            [".", "MemoryUtilization", ".", ".", ".", "."],
+            for name, svc in aws_ecs_service.service : ["AWS/ECS", "CPUUtilization", "ClusterName", aws_ecs_cluster.main.name, "ServiceName", svc.name]
           ]
         }
       },
@@ -94,7 +93,7 @@ resource "aws_cloudwatch_dashboard" "main" {
           metrics = [
             ["AWS/ApplicationELB", "RequestCount", "LoadBalancer", aws_lb.api.arn_suffix],
             [".", "HTTPCode_Target_5XX_Count", ".", "."],
-            [".", "HealthyHostCount", "LoadBalancer", aws_lb.api.arn_suffix, "TargetGroup", aws_lb_target_group.api.arn_suffix, { stat = "Minimum" }],
+            [".", "HealthyHostCount", "LoadBalancer", aws_lb.api.arn_suffix, "TargetGroup", aws_lb_target_group.service["shop-api"].arn_suffix, { stat = "Minimum" }],
           ]
         }
       },

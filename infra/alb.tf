@@ -33,8 +33,9 @@ resource "aws_lb" "api" {
   subnets            = aws_subnet.public[*].id
 }
 
-resource "aws_lb_target_group" "api" {
-  name                 = "${var.project}-api"
+resource "aws_lb_target_group" "service" {
+  for_each             = local.services
+  name                 = "${var.project}-${each.key}"
   port                 = 8080 # overridden per task by the dynamic host port
   protocol             = "HTTP"
   target_type          = "instance"
@@ -42,7 +43,7 @@ resource "aws_lb_target_group" "api" {
   deregistration_delay = 30
 
   health_check {
-    path                = "/api/health"
+    path                = each.key == "admin-api" ? "/admin/api/health" : "/api/health"
     matcher             = "200"
     interval            = 15
     healthy_threshold   = 2
@@ -50,6 +51,7 @@ resource "aws_lb_target_group" "api" {
   }
 }
 
+# /api/* and everything else -> shop API; /admin/api/* -> admin API.
 resource "aws_lb_listener" "http" {
   load_balancer_arn = aws_lb.api.arn
   port              = 80
@@ -57,6 +59,22 @@ resource "aws_lb_listener" "http" {
 
   default_action {
     type             = "forward"
-    target_group_arn = aws_lb_target_group.api.arn
+    target_group_arn = aws_lb_target_group.service["shop-api"].arn
+  }
+}
+
+resource "aws_lb_listener_rule" "admin" {
+  listener_arn = aws_lb_listener.http.arn
+  priority     = 10
+
+  condition {
+    path_pattern {
+      values = ["/admin/api/*"]
+    }
+  }
+
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.service["admin-api"].arn
   }
 }

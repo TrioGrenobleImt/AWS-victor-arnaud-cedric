@@ -1,7 +1,8 @@
 // Shop API (Express), runs as an ECS service behind the ALB.
 // CloudFront routes /api/* here; the storefront and images are served from S3.
 import express from "express";
-import { createOrder, getOrder, listProducts } from "../lib/orders.js";
+import { createOrder, getOrder } from "../lib/orders.js";
+import { listProducts } from "../lib/products.js";
 
 export function createApp({ instance = () => ({}) } = {}) {
   const app = express();

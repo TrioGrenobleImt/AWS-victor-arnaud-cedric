@@ -8,13 +8,18 @@
   },
   "scripts": {
     "start": "node api/server.js",
-    "test": "node --test"
+    "start:admin": "node admin/server.js",
+    "dev": "node dev/server.js",
+    "test": "node test/run.js"
   },
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.1158.0",
     "@aws-sdk/client-s3": "^3.1158.0",
     "@aws-sdk/client-sns": "^3.1158.0",
     "@aws-sdk/lib-dynamodb": "^3.1158.0",
+    "@aws-sdk/s3-presigned-post": "^3.1158.0",
+    "@aws-sdk/s3-request-presigner": "^3.1158.0",
+    "aws-jwt-verify": "^5.2.1",
     "express": "^5.3.0"
   }
 }

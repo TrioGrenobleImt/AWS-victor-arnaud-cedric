@@ -2,11 +2,13 @@ import "./style.css";
 import { api, imageUrl } from "./api.js";
 
 const STEPS = [
-  { status: "PENDING", label: "Order placed" },
-  { status: "PACKING", label: "Packing your records" },
+  { status: "ORDERED", label: "Order placed" },
+  { status: "PACKED", label: "Packed by the shop" },
   { status: "SHIPPED", label: "Shipped" },
 ];
 const MAX_QTY = 10;
+const POLL_MS = 5000; // the shop packs and ships by hand (back office): check every 5 s for 10 min
+const POLL_TIMES = 120;
 
 const state = { products: [], cart: {}, genre: "All", query: "" };
 const $ = (id) => document.getElementById(id);
@@ -15,6 +17,7 @@ const escapeHtml = (value) =>
   String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 const euros = (n) => `${Number(n).toFixed(2)} €`;
 const productById = (id) => state.products.find((p) => p.id === id);
+const maxQty = (p) => Math.min(MAX_QTY, p?.stock ?? 0);
 
 // --- Catalog ----------------------------------------------------------------
 function renderGenres() {
@@ -53,8 +56,8 @@ function card(p) {
         <p class="desc">${escapeHtml(p.description)}</p>
         <div class="buy">
           <span class="price">${euros(p.price)}</span>
-          <button type="button" class="add" data-add="${escapeHtml(p.id)}" ${inCrate >= MAX_QTY ? "disabled" : ""}>
-            ${inCrate ? `In crate · ${inCrate}` : "Add to crate"}
+          <button type="button" class="add" data-add="${escapeHtml(p.id)}" ${inCrate >= maxQty(p) ? "disabled" : ""}>
+            ${inCrate ? `In crate · ${inCrate}` : p.stock > 0 ? "Add to crate" : "Sold out"}
           </button>
         </div>
         <p class="stock">${p.stock > 0 ? `${escapeHtml(p.stock)} in stock` : "Out of stock"}</p>
@@ -64,7 +67,7 @@ function card(p) {
 
 // --- Crate (cart) -------------------------------------------------------------
 function setQty(id, qty) {
-  state.cart[id] = Math.max(0, Math.min(MAX_QTY, qty));
+  state.cart[id] = Math.max(0, Math.min(maxQty(productById(id)), qty));
   if (!state.cart[id]) delete state.cart[id];
   renderCart();
   renderCatalog();
@@ -89,7 +92,7 @@ function renderCart() {
                 <div class="stepper">
                   <button type="button" data-dec="${escapeHtml(id)}" aria-label="One less">−</button>
                   <span>${qty}</span>
-                  <button type="button" data-inc="${escapeHtml(id)}" aria-label="One more" ${qty >= MAX_QTY ? "disabled" : ""}>+</button>
+                  <button type="button" data-inc="${escapeHtml(id)}" aria-label="One more" ${qty >= maxQty(p) ? "disabled" : ""}>+</button>
                 </div>
               </div>
               <span class="line-price">${euros(p.price * qty)}</span>
@@ -110,6 +113,11 @@ function openCrate(open) {
 
 // --- Checkout + tracking ------------------------------------------------------
 function renderStatus(order) {
+  if (order.status === "CANCELLED") {
+    $("timeline").innerHTML = `<li class="current">Cancelled by the shop</li>`;
+    $("orderJson").textContent = JSON.stringify(order, null, 2);
+    return;
+  }
   const last = STEPS.length - 1;
   const found = STEPS.findIndex((s) => s.status === order.status);
   const idx = found === last ? last + 1 : found; // the final step is "done", not "in progress"
@@ -120,11 +128,11 @@ function renderStatus(order) {
 }
 
 async function poll(orderId) {
-  for (let i = 0; i < 30; i++) {
+  for (let i = 0; i < POLL_TIMES; i++) {
     const order = await api("/orders/" + orderId);
     renderStatus(order);
-    if (order.status === "SHIPPED") return;
-    await new Promise((r) => setTimeout(r, 2000));
+    if (order.status === "SHIPPED" || order.status === "CANCELLED") return;
+    await new Promise((r) => setTimeout(r, POLL_MS));
   }
 }
 
@@ -143,8 +151,7 @@ async function placeOrder(event) {
       }),
     });
     state.cart = {};
-    renderCart();
-    renderCatalog();
+    await loadProducts(); // stock changed
     $("confirmMsg").textContent = res.message;
     $("cartView").hidden = true;
     $("trackView").hidden = false;
@@ -153,6 +160,7 @@ async function placeOrder(event) {
   } catch (e) {
     $("checkoutError").textContent = "Order failed: " + e.message;
     $("checkoutError").hidden = false;
+    loadProducts().catch(() => {}); // e.g. sold out meanwhile: show the current stock
   } finally {
     button.disabled = !Object.keys(state.cart).length;
   }
@@ -195,11 +203,16 @@ api("/health")
   .then((h) => ($("backend").textContent = `backend: ${h.backend} · ${h.instance || ""} ${h.az || ""}`))
   .catch(() => ($("backend").textContent = "backend: unreachable"));
 
-api("/products")
-  .then((products) => {
-    state.products = products;
-    renderGenres();
-    renderCatalog();
-    renderCart();
-  })
-  .catch((e) => ($("catalog").innerHTML = `<p class="error">Could not load the catalog: ${escapeHtml(e.message)}</p>`));
+async function loadProducts() {
+  state.products = await api("/products");
+  // drop crate lines that are no longer available in that quantity
+  for (const [id, qty] of Object.entries(state.cart)) {
+    const max = maxQty(productById(id));
+    if (qty > max) max ? (state.cart[id] = max) : delete state.cart[id];
+  }
+  renderGenres();
+  renderCatalog();
+  renderCart();
+}
+
+loadProducts().catch((e) => ($("catalog").innerHTML = `<p class="error">Could not load the catalog: ${escapeHtml(e.message)}</p>`));

@@ -13,7 +13,7 @@ const root = resolve(import.meta.dirname, "..");
 function mockApi() {
   const catalog = JSON.parse(readFileSync(resolve(root, "data", "catalog.json"), "utf8"));
   const orders = new Map();
-  const STEPS = ["PENDING", "PACKING", "SHIPPED"];
+  const STEPS = ["ORDERED", "PACKED", "SHIPPED"]; // moved by the back office in the real stack
   const send = (res, status, body) => {
     res.statusCode = status;
     res.setHeader("Content-Type", "application/json");
@@ -58,7 +58,7 @@ function mockApi() {
             orders.set(order_id, { order_id, items, total, placed: Date.now() });
             send(res, 201, {
               order_id,
-              status: "PENDING",
+              status: "ORDERED",
               total,
               message: `Thank you ${body.customer_name}! Order ${order_id.slice(0, 8)} confirmed (${total.toFixed(2)} €).`,
             });

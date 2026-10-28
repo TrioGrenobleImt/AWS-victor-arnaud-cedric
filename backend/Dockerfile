@@ -1,4 +1,4 @@
-# Shop API image (ECS on EC2). Build context: backend/
+# API image for both ECS services (shop: api/server.js, admin: admin/server.js). Build context: backend/
 FROM public.ecr.aws/docker/library/node:22-alpine
 
 WORKDIR /app
@@ -7,6 +7,7 @@ COPY package.json package-lock.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 COPY lib ./lib
 COPY api ./api
+COPY admin ./admin
 
 USER node
 EXPOSE 8080

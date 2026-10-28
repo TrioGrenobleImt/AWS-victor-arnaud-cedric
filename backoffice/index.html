@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>FISA Records Back Office</title>
+  <link rel="icon" href="/admin/favicon.svg" type="image/svg+xml">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#/dashboard"><span class="brand-disc" aria-hidden="true"></span>FISA Records <span class="tag">Back office</span></a>
+    <nav class="nav" aria-label="Sections">
+      <a href="#/dashboard" data-nav="dashboard">Dashboard</a>
+      <a href="#/orders" data-nav="orders">Orders</a>
+      <a href="#/products" data-nav="products">Products</a>
+    </nav>
+    <div class="who">
+      <span id="who" class="muted"></span>
+      <button id="logout" class="ghost" type="button">Sign out</button>
+    </div>
+  </header>
+
+  <main id="view" class="view" aria-live="polite"><p class="muted">Loading…</p></main>
+
+  <dialog id="dialog"></dialog>
+  <div id="toast" class="toast" role="status" hidden></div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
