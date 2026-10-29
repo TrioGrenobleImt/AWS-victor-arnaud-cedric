@@ -9,6 +9,10 @@ export function createApp({ instance = () => ({}), verify } = {}) {
   const app = express();
   app.disable("x-powered-by");
   app.use(express.json({ limit: "32kb" }));
+  app.use((req, res, next) => {
+    res.set("Cache-Control", "no-store"); // never cached by CloudFront or the browser
+    next();
+  });
 
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok", backend: "ecs", ...instance() });

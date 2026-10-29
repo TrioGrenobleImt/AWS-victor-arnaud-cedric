@@ -26,7 +26,9 @@ const validOrder = {
 const placeOrder = async (body = validOrder) => (await api("/orders", json("POST", body))).json();
 
 test("health reports the ECS task", async () => {
-  assert.deepEqual(await (await api("/health")).json(), { status: "ok", backend: "ecs", instance: "task-1", az: "eu-west-3a" });
+  const res = await api("/health");
+  assert.deepEqual(await res.json(), { status: "ok", backend: "ecs", instance: "task-1", az: "eu-west-3a" });
+  assert.equal(res.headers.get("cache-control"), "no-store");
 });
 
 test("products are sorted by id", async () => {
