@@ -131,12 +131,10 @@ s.node(460, 860, 200, 70, "Account baseline", ["CloudTrail → S3", "Budgets ale
 
 # data
 s.node(700, 470, 210, 84, "DynamoDB products", ["catalog (back-office owned)", "atomic stock updates"], "db", "DDB")
-s.node(950, 470, 210, 96, "DynamoDB orders", ["orders + status history", "by_month · by_customer", "stream NEW_AND_OLD"], "db", "DDB")
+s.node(950, 470, 210, 96, "DynamoDB orders", ["orders + status history", "by_month · by_customer"], "db", "DDB")
 s.node(1210, 470, 210, 70, "SNS order-events", ["topic · encrypted"], "integ", "SNS")
 s.node(1450, 470, 210, 70, "Shop owner", ["email subscription", "all order events"], "user", "@")
 
-s.node(700, 610, 210, 70, "audit-stream", ["Lambda · stream consumer", "batch 25 · bisect on error"], "compute", "λ")
-s.node(700, 740, 210, 84, "S3 audit", ["partitioned by date", "versioned · 90 d expiry"], "storage", "S3")
 s.node(950, 740, 210, 84, "S3 documents", ["packing slips · private", "5-min presigned links"], "storage", "S3")
 s.node(1210, 610, 210, 84, "SQS order-processing", ["filter: ORDER_PLACED", "DLQ after 3 tries"], "integ", "SQS")
 s.node(1210, 740, 210, 96, "order-processor", ["Lambda · batch 5", "writes packing slip,", "links it to the order"], "compute", "λ")
@@ -172,8 +170,6 @@ s.label(1215, 445, "publish events")
 
 # event pipeline
 s.arrow([(1420, 505), (1450, 505)])
-s.arrow([(1055, 566), (1055, 590), (805, 590), (805, 610)], "stream", at=(930, 590))
-s.arrow([(805, 680), (805, 740)], "JSON per change", at=(805, 710))
 s.arrow([(1280, 540), (1280, 610)], "ORDER_PLACED", at=(1280, 575))
 s.arrow([(1400, 540), (1400, 575), (1555, 575), (1555, 610)], "all events", at=(1480, 575))
 s.arrow([(1315, 694), (1315, 740)])
@@ -186,8 +182,7 @@ s.badge(685, 205, 1)
 s.badge(1330, 458, 2)
 s.badge(1331, 718, 3)
 s.badge(1572, 842, 4)
-s.badge(880, 715, 5)
 s.legend(1000, ["Browse & order via CloudFront", "Order stored, event published", "Queue → packing slip",
-                "Customer email via SES", "Audit stream to S3"])
+                "Customer email via SES"])
 s.save("architecture.svg")
 print("ok")

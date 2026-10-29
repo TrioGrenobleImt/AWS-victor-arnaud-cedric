@@ -1,8 +1,7 @@
 # FISA Shop — AWS Project 2026
 
 Online vinyl record shop ("FISA Records") where customers browse a catalog,
-place orders and get a real-time confirmation. Orders are recorded for audit
-and trigger internal processing (packing slip). Shop staff use a separate
+place orders and get a real-time confirmation. Orders trigger internal processing (packing slip). Shop staff use a separate
 **back office** to add records (with cover images), restock, follow this
 month's sales and move orders from *ordered* to *packed* to *shipped*.
 
@@ -14,10 +13,10 @@ Tier, combining **containers on EC2 (ECS)** for the request/response API and
 |---|---|---|
 | **ECS on EC2** (Express, Node.js) | Shop API: catalog, place order, track order | Answers users, always on, horizontal scaling behind an ALB |
 | **ECS on EC2** (Express, Node.js) | Admin API: products, stock, image uploads, orders, sales dashboard, team accounts | Separate service + IAM role, same cluster and ALB (path rule) |
-| **Lambda** (Node.js) | Packing slips (SQS), customer emails via SES (SQS), audit trail (DynamoDB Stream) | Triggered by events, bursty, no idle cost |
+| **Lambda** (Node.js) | Packing slips (SQS), customer emails via SES (SQS) | Triggered by events, bursty, no idle cost |
 | **S3 + CloudFront** | Storefront and back office (Vite), product images, packing slips | Static content at the edge, single HTTPS entry point |
 | **Cognito** | Two user pools (free Lite tier): back-office sign-in (hosted login, `admins` / `owners` groups) and customer sign-in/up for the storefront (own page, Cognito API) | Managed users/passwords, kept apart so a customer can never reach the admin API |
-| **DynamoDB** | Products and orders (+ stream, `by_month` index) | Serverless, always-free 25 RCU/WCU |
+| **DynamoDB** | Products and orders (`by_month`, `by_customer` indexes) | Serverless, always-free 25 RCU/WCU |
 
 Both APIs and the Lambdas use the same code for the order domain
 (`backend/lib/`):
@@ -43,7 +42,7 @@ Both APIs and the Lambdas use the same code for the order domain
 │   ├── lib/                  #   shared order domain + AWS clients
 │   ├── api/                  #   Express shop API (ECS service), Dockerfile in backend/
 │   ├── admin/                #   Express admin API (2nd ECS service, Cognito tokens)
-│   ├── functions/            #   Lambdas: order-processor, customer-notifier, audit-stream
+│   ├── functions/            #   Lambdas: order-processor, customer-notifier
 │   ├── dev/                  #   local backend: DynamoDB Local + S3 stand-in (`npm run dev`)
 │   └── test/                 #   tests against DynamoDB Local (SNS/S3/SES captured)
 ├── infra/                    # Single Terraform root module
@@ -128,7 +127,6 @@ flowchart LR
     SNS --> SQS[SQS + DLQ] --> L1[λ order-processor] --> S3D[(S3 documents<br/>packing slips)]
     L1 --> OT
     SNS --> Mail[Email]
-    OT -->|DynamoDB Stream| L2[λ audit-stream] --> S3A[(S3 audit<br/>versioned, 90 d)]
 ```
 
 ### Event flow
@@ -141,7 +139,6 @@ sequenceDiagram
     participant SNS as SNS order-events
     participant Q as SQS order-processing (+DLQ)
     participant W as λ order-processor
-    participant A as λ audit-stream → S3
     participant B as Admin (back office → admin API)
     participant M as Email subscriber
 
@@ -149,14 +146,12 @@ sequenceDiagram
     API->>DB: transaction: store order (ORDERED) + take stock
     API->>SNS: publish ORDER_PLACED
     API-->>C: 201 confirmation (real time)
-    DB-->>A: stream INSERT
     SNS->>M: "Thank you for your order" email
     SNS->>Q: filter policy event_type = ORDER_PLACED
     Q->>W: consume
     W->>DB: packing slip in S3, linked to the order
     B->>DB: PACKED, then SHIPPED + tracking (conditional writes)
     B->>SNS: ORDER_PACKED / ORDER_SHIPPED (owner email + customer-emails queue, filtered out of the processing queue)
-    DB-->>A: stream MODIFY ×2
     C->>API: GET /api/orders/{id} (polling every 5 s)
 ```
 
@@ -170,9 +165,6 @@ failed messages are retried 3 times and then moved to a dead-letter queue
   (`-var asg_min_size=2`); task auto scaling on CPU (60 %) and the ECS capacity
   provider adds an instance when tasks no longer fit. DynamoDB, SQS, SNS,
   Lambda, S3 and CloudFront are multi-AZ or global by design.
-* **Streaming**: DynamoDB Streams → Lambda replaces Kafka/MSK at zero cost; the
-  audit bucket is partitioned by date (`orders/dt=YYYY-MM-DD/…`) so it can be
-  queried with Athena for reporting.
 * **Security**: the back office needs a Cognito sign-in (hosted login,
   authorization code + PKCE, no self sign-up) and the admin API checks every
   access token (signature, expiry, client, `admins` group); covers are uploaded
@@ -254,7 +246,7 @@ packed, then shipped, and watch the customer's timeline follow
 the stock went down. The storefront footer shows which ECS task and AZ answered.
 
 ```bash
-./tests/test.sh       # load balancing, catalog + image, order, packing slip, S3 audit trail, access control
+./tests/test.sh       # load balancing, catalog + image, order, packing slip, access control
 ADMIN_EMAIL=you@example.com ADMIN_PASSWORD='…' ./tests/test.sh   # + back office: packed, shipped, dashboard
 ./tests/failover.sh   # stop an API task: the ALB keeps serving and ECS starts a replacement
 ```
@@ -262,9 +254,6 @@ ADMIN_EMAIL=you@example.com ADMIN_PASSWORD='…' ./tests/test.sh   # + back offi
 Useful checks during the demo:
 
 ```bash
-# Audit trail: one JSON document per order change
-aws s3 ls s3://$(terraform -chdir=infra output -raw audit_bucket)/orders/ --recursive
-
 # API logs (ECS) and processor logs (Lambda)
 aws logs tail /ecs/fisa-shop/shop-api --follow
 aws logs tail /ecs/fisa-shop/admin-api --follow
@@ -282,10 +271,10 @@ CloudWatch dashboard: `terraform -chdir=infra output dashboard_url`.
 | ECR | 1 repository, last 5 images | 500 MB/month (12 months) |
 | ALB | 1 ALB | 750 h + 15 LCU/month (12-month legacy Free Tier). **Its public IPv4 addresses are billed** (~0.005 USD/h each ≈ 0.25 USD/day) |
 | Lambda | 2 functions, arm64 128 MB | 1 M requests + 400 000 GB-s/month (always free) |
-| DynamoDB | 2 tables + 1 index × 5 RCU/WCU, Streams | 25 RCU/WCU + 25 GB + 2.5 M stream reads (always free) |
+| DynamoDB | 2 tables + 2 indexes × 5 RCU/WCU | 25 RCU/WCU + 25 GB (always free) |
 | Cognito | Lite tier, hosted login | 10 000 monthly active users free |
 | CloudFront | 2 distributions (storefront, back office) | 1 TB + 10 M requests/month across all distributions (always free) |
-| S3 | website, images, documents, audit, trail | 5 GB (12 months) |
+| S3 | website, images, documents, trail | 5 GB (12 months) |
 | SNS / SQS | | 1 M publishes / 1 M requests (always free) |
 | CloudWatch | 6 alarms, 1 dashboard, logs 7 days | 10 alarms + 3 dashboards + 5 GB logs |
 | CloudTrail | 1 trail, management events | first copy free |
@@ -304,7 +293,6 @@ terraform -chdir=infra destroy
 
 | Need | Implemented (free) | Production alternative (paid) |
 |---|---|---|
-| Streaming | DynamoDB Streams → Lambda | Amazon MSK / MSK Serverless (Kafka) or Kinesis Data Streams → Firehose → S3 |
 | Private container instances | public subnets + SG (inbound from ALB only) | private subnets + NAT Gateway or VPC endpoints |
 | Database | DynamoDB provisioned 5 RCU/WCU | on-demand capacity, global tables, PITR backups |
 | Custom domains + TLS CloudFront → ALB | one default `*.cloudfront.net` address per app, HTTP between CloudFront and ALB | domain + Route 53 hosted zone (~0.50 USD/month) + free ACM certificates: `shop.` / `admin.` subdomains |

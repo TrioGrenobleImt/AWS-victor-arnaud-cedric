@@ -79,7 +79,6 @@
 <g><rect x='950' y='470' width='210' height='96' rx='6' fill='#fff' stroke='#C925D1' stroke-width='1.6'/><rect x='960' y='482' width='34' height='34' rx='4' fill='#C925D1'/><text x='977' y='503' font-size='10.5' font-weight='700' fill='#fff' text-anchor='middle'>DDB</text><text x='1002' y='496' font-size='13.5' font-weight='700' fill='#16191f'>DynamoDB orders</text>
 <text x='1002' y='513' font-size='11.5' fill='#5f6b7a'>orders + status history</text>
 <text x='1002' y='528' font-size='11.5' fill='#5f6b7a'>by_month · by_customer</text>
-<text x='1002' y='543' font-size='11.5' fill='#5f6b7a'>stream NEW_AND_OLD</text>
 </g>
 <g><rect x='1210' y='470' width='210' height='70' rx='6' fill='#fff' stroke='#E7157B' stroke-width='1.6'/><rect x='1220' y='482' width='34' height='34' rx='4' fill='#E7157B'/><text x='1237' y='503' font-size='10.5' font-weight='700' fill='#fff' text-anchor='middle'>SNS</text><text x='1262' y='496' font-size='13.5' font-weight='700' fill='#16191f'>SNS order-events</text>
 <text x='1262' y='513' font-size='11.5' fill='#5f6b7a'>topic · encrypted</text>
@@ -87,14 +86,6 @@
 <g><rect x='1450' y='470' width='210' height='70' rx='6' fill='#fff' stroke='#232F3E' stroke-width='1.6'/><rect x='1460' y='482' width='34' height='34' rx='4' fill='#232F3E'/><text x='1477' y='503' font-size='10.5' font-weight='700' fill='#fff' text-anchor='middle'>@</text><text x='1502' y='496' font-size='13.5' font-weight='700' fill='#16191f'>Shop owner</text>
 <text x='1502' y='513' font-size='11.5' fill='#5f6b7a'>email subscription</text>
 <text x='1502' y='528' font-size='11.5' fill='#5f6b7a'>all order events</text>
-</g>
-<g><rect x='700' y='610' width='210' height='70' rx='6' fill='#fff' stroke='#ED7100' stroke-width='1.6'/><rect x='710' y='622' width='34' height='34' rx='4' fill='#ED7100'/><text x='727' y='643' font-size='10.5' font-weight='700' fill='#fff' text-anchor='middle'>λ</text><text x='752' y='636' font-size='13.5' font-weight='700' fill='#16191f'>audit-stream</text>
-<text x='752' y='653' font-size='11.5' fill='#5f6b7a'>Lambda · stream consumer</text>
-<text x='752' y='668' font-size='11.5' fill='#5f6b7a'>batch 25 · bisect on error</text>
-</g>
-<g><rect x='700' y='740' width='210' height='84' rx='6' fill='#fff' stroke='#7AA116' stroke-width='1.6'/><rect x='710' y='752' width='34' height='34' rx='4' fill='#7AA116'/><text x='727' y='773' font-size='10.5' font-weight='700' fill='#fff' text-anchor='middle'>S3</text><text x='752' y='766' font-size='13.5' font-weight='700' fill='#16191f'>S3 audit</text>
-<text x='752' y='783' font-size='11.5' fill='#5f6b7a'>partitioned by date</text>
-<text x='752' y='798' font-size='11.5' fill='#5f6b7a'>versioned · 90 d expiry</text>
 </g>
 <g><rect x='950' y='740' width='210' height='84' rx='6' fill='#fff' stroke='#7AA116' stroke-width='1.6'/><rect x='960' y='752' width='34' height='34' rx='4' fill='#7AA116'/><text x='977' y='773' font-size='10.5' font-weight='700' fill='#fff' text-anchor='middle'>S3</text><text x='1002' y='766' font-size='13.5' font-weight='700' fill='#16191f'>S3 documents</text>
 <text x='1002' y='783' font-size='11.5' fill='#5f6b7a'>packing slips · private</text>
@@ -139,8 +130,6 @@
 <path d='M1055,445 L1055,470' fill='none' stroke='#414d5c' stroke-width='1.6' marker-end='url(#a)'/>
 <path d='M1315,445 L1315,470' fill='none' stroke='#414d5c' stroke-width='1.6' marker-end='url(#a)'/>
 <path d='M1420,505 L1450,505' fill='none' stroke='#414d5c' stroke-width='1.6' marker-end='url(#a)'/>
-<path d='M1055,566 L1055,590 L805,590 L805,610' fill='none' stroke='#414d5c' stroke-width='1.6' marker-end='url(#a)'/>
-<path d='M805,680 L805,740' fill='none' stroke='#414d5c' stroke-width='1.6' marker-end='url(#a)'/>
 <path d='M1280,540 L1280,610' fill='none' stroke='#414d5c' stroke-width='1.6' marker-end='url(#a)'/>
 <path d='M1400,540 L1400,575 L1555,575 L1555,610' fill='none' stroke='#414d5c' stroke-width='1.6' marker-end='url(#a)'/>
 <path d='M1315,694 L1315,740' fill='none' stroke='#414d5c' stroke-width='1.6' marker-end='url(#a)'/>
@@ -153,7 +142,6 @@
 <text x='277.4' y='1004' font-size='12' font-weight='400' fill='#414d5c' text-anchor='start'>Order stored, event published</text>
 <text x='498.79999999999995' y='1004' font-size='12' font-weight='400' fill='#414d5c' text-anchor='start'>Queue → packing slip</text>
 <text x='660.8' y='1004' font-size='12' font-weight='400' fill='#414d5c' text-anchor='start'>Customer email via SES</text>
-<text x='836.0' y='1004' font-size='12' font-weight='400' fill='#414d5c' text-anchor='start'>Audit stream to S3</text>
 <path d='M1370,1000 L1410,1000' stroke='#414d5c' stroke-width='1.6' marker-end='url(#a)'/>
 <text x='1418' y='1004' font-size='12' font-weight='400' fill='#414d5c' text-anchor='start'>request / event</text>
 <path d='M1530,1000 L1570,1000' stroke='#8d99a8' stroke-width='1.6' stroke-dasharray='6 4' marker-end='url(#ad)'/>
@@ -168,18 +156,14 @@
 <rect x='955.04' y='267' width='83.92' height='17' rx='3' fill='#fff' stroke='#d5dbe1'/><text x='997' y='280' font-size='11' fill='#414d5c' text-anchor='middle'>/admin/api/*</text>
 <rect x='858.04' y='436' width='83.92' height='17' rx='3' fill='#fff' stroke='#d5dbe1'/><text x='900' y='449' font-size='11' fill='#414d5c' text-anchor='middle'>read / write</text>
 <rect x='1166.88' y='436' width='96.24000000000001' height='17' rx='3' fill='#fff' stroke='#d5dbe1'/><text x='1215' y='449' font-size='11' fill='#414d5c' text-anchor='middle'>publish events</text>
-<rect x='906.52' y='581' width='46.96' height='17' rx='3' fill='#fff' stroke='#d5dbe1'/><text x='930' y='594' font-size='11' fill='#414d5c' text-anchor='middle'>stream</text>
-<rect x='753.8' y='701' width='102.4' height='17' rx='3' fill='#fff' stroke='#d5dbe1'/><text x='805' y='714' font-size='11' fill='#414d5c' text-anchor='middle'>JSON per change</text>
 <rect x='1238.04' y='566' width='83.92' height='17' rx='3' fill='#fff' stroke='#d5dbe1'/><text x='1280' y='579' font-size='11' fill='#414d5c' text-anchor='middle'>ORDER_PLACED</text>
 <rect x='1444.2' y='566' width='71.60000000000001' height='17' rx='3' fill='#fff' stroke='#d5dbe1'/><text x='1480' y='579' font-size='11' fill='#414d5c' text-anchor='middle'>all events</text>
 <circle cx='685' cy='205' r='10' fill='#232F3E'/><text x='685' y='209' font-size='11' font-weight='700' fill='#fff' text-anchor='middle'>1</text>
 <circle cx='1330' cy='458' r='10' fill='#232F3E'/><text x='1330' y='462' font-size='11' font-weight='700' fill='#fff' text-anchor='middle'>2</text>
 <circle cx='1331' cy='718' r='10' fill='#232F3E'/><text x='1331' y='722' font-size='11' font-weight='700' fill='#fff' text-anchor='middle'>3</text>
 <circle cx='1572' cy='842' r='10' fill='#232F3E'/><text x='1572' y='846' font-size='11' font-weight='700' fill='#fff' text-anchor='middle'>4</text>
-<circle cx='880' cy='715' r='10' fill='#232F3E'/><text x='880' y='719' font-size='11' font-weight='700' fill='#fff' text-anchor='middle'>5</text>
 <circle cx='40' cy='1000' r='10' fill='#232F3E'/><text x='40' y='1004' font-size='11' font-weight='700' fill='#fff' text-anchor='middle'>1</text>
 <circle cx='261.4' cy='1000' r='10' fill='#232F3E'/><text x='261.4' y='1004' font-size='11' font-weight='700' fill='#fff' text-anchor='middle'>2</text>
 <circle cx='482.79999999999995' cy='1000' r='10' fill='#232F3E'/><text x='482.79999999999995' y='1004' font-size='11' font-weight='700' fill='#fff' text-anchor='middle'>3</text>
 <circle cx='644.8' cy='1000' r='10' fill='#232F3E'/><text x='644.8' y='1004' font-size='11' font-weight='700' fill='#fff' text-anchor='middle'>4</text>
-<circle cx='820.0' cy='1000' r='10' fill='#232F3E'/><text x='820.0' y='1004' font-size='11' font-weight='700' fill='#fff' text-anchor='middle'>5</text>
 </svg>

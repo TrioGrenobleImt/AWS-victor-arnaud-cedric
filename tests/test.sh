@@ -6,8 +6,7 @@
 #   4. async processing : SNS -> SQS -> Lambda writes the packing slip (documents bucket)
 #   5. back office      : admin API (Cognito token) moves ORDERED -> PACKED -> SHIPPED
 #                         needs ADMIN_EMAIL + ADMIN_PASSWORD of a confirmed admin, skipped otherwise
-#   6. audit streaming  : DynamoDB Stream -> Lambda -> S3 audit documents
-#   7. validation       : bad order rejected with 400, admin API rejects anonymous calls
+#   6. validation       : bad order rejected with 400, admin API rejects anonymous calls
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -15,7 +14,6 @@ tf() { terraform -chdir=infra output -raw "$1"; }
 BASE_URL="${BASE_URL:-$(tf base_url)}"
 ADMIN_URL="${ADMIN_URL:-$(tf backoffice_url)}"
 ADMIN_URL="${ADMIN_URL%/}"
-AUDIT_BUCKET=$(tf audit_bucket)
 DOCUMENTS_BUCKET=$(tf documents_bucket)
 echo "Storefront: $BASE_URL   Back office: $ADMIN_URL"
 
@@ -61,11 +59,7 @@ else
 fi
 curl -sf "$BASE_URL/api/orders/$ORDER_ID" | jq '{order_id, status, total, history}'
 
-echo -e "\n== 6. Audit trail in S3 (DynamoDB Stream) =="
-sleep 10
-aws s3 ls "s3://$AUDIT_BUCKET/orders/" --recursive | grep "$ORDER_ID" || echo "(no audit document yet, retry in a few seconds)"
-
-echo -e "\n== 7. Validation and access control =="
+echo -e "\n== 6. Validation and access control =="
 curl -s -o /dev/null -w 'bad order:          HTTP %{http_code}\n' -X POST "$BASE_URL/api/orders" -H 'Content-Type: application/json' -d '{"items": []}'
 curl -s -o /dev/null -w 'anonymous admin:    HTTP %{http_code}\n' "$ADMIN_URL/admin/api/orders"
 curl -s -o /dev/null -w 'admin via the shop: HTTP %{http_code} (not routed)\n' "$BASE_URL/admin/api/orders"

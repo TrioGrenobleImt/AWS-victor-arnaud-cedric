@@ -142,19 +142,7 @@ resource "aws_cloudwatch_dashboard" "main" {
             [".", "ApproximateNumberOfMessagesVisible", "QueueName", aws_sqs_queue.orders_dlq.name],
           ]
         }
-      },
-      {
-        type = "metric", x = 12, y = 12, width = 12, height = 6
-        properties = {
-          title  = "DynamoDB consumed capacity (orders)"
-          region = var.region
-          stat   = "Sum"
-          metrics = [
-            ["AWS/DynamoDB", "ConsumedReadCapacityUnits", "TableName", aws_dynamodb_table.orders.name],
-            [".", "ConsumedWriteCapacityUnits", ".", "."],
-          ]
-        }
-      },
+      }
     ]
   })
 }

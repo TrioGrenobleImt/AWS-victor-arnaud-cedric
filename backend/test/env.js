@@ -8,7 +8,6 @@ Object.assign(process.env, {
   PRODUCTS_TABLE: `products-${suffix}`,
   ORDERS_TABLE: `orders-${suffix}`,
   TOPIC_ARN: "arn:aws:sns:eu-west-3:000000000000:orders",
-  AUDIT_BUCKET: "audit",
   IMAGES_BUCKET: "images",
   DOCUMENTS_BUCKET: "documents",
   SENDER_EMAIL: "shop@example.com",

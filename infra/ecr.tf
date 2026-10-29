@@ -24,19 +24,6 @@ resource "aws_ecr_repository" "api" {
   }
 }
 
-# Keeps storage under the 500 MB ECR free tier.
-resource "aws_ecr_lifecycle_policy" "api" {
-  repository = aws_ecr_repository.api.name
-  policy = jsonencode({
-    rules = [{
-      rulePriority = 1
-      description  = "keep the last 5 images"
-      selection    = { tagStatus = "any", countType = "imageCountMoreThan", countNumber = 5 }
-      action       = { type = "expire" }
-    }]
-  })
-}
-
 resource "terraform_data" "api_image" {
   triggers_replace = [local.api_image]
 
