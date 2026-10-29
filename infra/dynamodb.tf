@@ -45,12 +45,16 @@ resource "aws_dynamodb_table_item" "products" {
   }
 }
 
+# Orders table with a DynamoDB Stream: every change is streamed to the audit
+# Lambda (streaming pattern, free alternative to Kinesis / MSK).
 resource "aws_dynamodb_table" "orders" {
-  name           = "${var.project}-orders"
-  billing_mode   = "PROVISIONED"
-  read_capacity  = var.dynamodb_capacity
-  write_capacity = var.dynamodb_capacity
-  hash_key       = "order_id"
+  name             = "${var.project}-orders"
+  billing_mode     = "PROVISIONED"
+  read_capacity    = var.dynamodb_capacity
+  write_capacity   = var.dynamodb_capacity
+  hash_key         = "order_id"
+  stream_enabled   = true
+  stream_view_type = "NEW_AND_OLD_IMAGES"
 
   attribute {
     name = "order_id"

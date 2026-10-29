@@ -28,6 +28,10 @@ output "documents_bucket" {
   value = aws_s3_bucket.documents.id
 }
 
+output "audit_bucket" {
+  value = aws_s3_bucket.audit.id
+}
+
 output "dashboard_url" {
   value = "https://${var.region}.console.aws.amazon.com/cloudwatch/home?region=${var.region}#dashboards:name=${aws_cloudwatch_dashboard.main.dashboard_name}"
 }

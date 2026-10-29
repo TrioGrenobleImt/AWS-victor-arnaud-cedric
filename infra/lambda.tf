@@ -1,5 +1,5 @@
 # --- Lambda functions (Node.js, same lib/ as the ECS API) --------------------
-# Event-driven work runs on Lambda: triggered by SQS, no
+# Event-driven work runs on Lambda: triggered by SQS / DynamoDB Streams, no
 # idle cost. Each zip holds the function, backend/lib/ and a package.json
 # marking the code as ES modules; the AWS SDK v3 comes with the runtime.
 locals {
@@ -12,6 +12,13 @@ locals {
       environment = {
         ORDERS_TABLE     = aws_dynamodb_table.orders.name
         DOCUMENTS_BUCKET = aws_s3_bucket.documents.id
+      }
+    }
+    audit-stream = {
+      description = "DynamoDB Stream consumer: writes every order change to the S3 audit bucket"
+      timeout     = 30
+      environment = {
+        AUDIT_BUCKET = aws_s3_bucket.audit.id
       }
     }
     }, local.notify_customers ? {
@@ -106,9 +113,21 @@ data "aws_iam_policy_document" "customer_notifier" {
   }
 }
 
+data "aws_iam_policy_document" "audit_stream" {
+  statement {
+    actions   = ["dynamodb:DescribeStream", "dynamodb:GetRecords", "dynamodb:GetShardIterator", "dynamodb:ListStreams"]
+    resources = [aws_dynamodb_table.orders.stream_arn]
+  }
+  statement {
+    actions   = ["s3:PutObject"]
+    resources = ["${aws_s3_bucket.audit.arn}/*"]
+  }
+}
+
 locals {
   function_policies = merge({
     order-processor = data.aws_iam_policy_document.order_processor.json
+    audit-stream    = data.aws_iam_policy_document.audit_stream.json
     }, local.notify_customers ? {
     customer-notifier = data.aws_iam_policy_document.customer_notifier[0].json
   } : {})
@@ -163,4 +182,15 @@ resource "aws_lambda_event_source_mapping" "customer_emails_queue" {
   function_name           = aws_lambda_function.fn["customer-notifier"].arn
   batch_size              = 5
   function_response_types = ["ReportBatchItemFailures"]
+}
+
+# DynamoDB Stream -> audit-stream
+resource "aws_lambda_event_source_mapping" "orders_stream" {
+  event_source_arn                   = aws_dynamodb_table.orders.stream_arn
+  function_name                      = aws_lambda_function.fn["audit-stream"].arn
+  starting_position                  = "LATEST"
+  batch_size                         = 25
+  maximum_batching_window_in_seconds = 5
+  maximum_retry_attempts             = 3
+  bisect_batch_on_function_error     = true
 }

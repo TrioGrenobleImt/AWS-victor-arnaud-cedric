@@ -3,6 +3,7 @@ import "./env.js";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createApp } from "../api/app.js";
+import { handler as auditStream } from "../functions/audit-stream/index.js";
 import { handler as notifyCustomers } from "../functions/customer-notifier/index.js";
 import { handler as processOrders } from "../functions/order-processor/index.js";
 import { cancelOrder, getOrder, setStatus } from "../lib/orders.js";
@@ -111,6 +112,14 @@ test("order processor writes a packing slip and links it to the order", async ()
 test("order processor reports failures for retry", async () => {
   const body = JSON.stringify({ order_id: "missing", customer_name: "x", customer_email: "x@y", items: [], total: 0 });
   assert.deepEqual(await processOrders({ Records: [{ messageId: "m1", body }] }), { batchItemFailures: [{ itemIdentifier: "m1" }] });
+});
+
+test("audit stream writes one S3 document per change", async () => {
+  await auditStream({
+    Records: [{ eventID: "e1", eventName: "INSERT", dynamodb: { Keys: { order_id: { S: "o-1" } }, ApproximateCreationDateTime: 1767225600, NewImage: {} } }],
+  });
+  assert.equal(sent.s3[0].Bucket, "audit");
+  assert.equal(sent.s3[0].Key, "orders/dt=2026-01-01/o-1/000000-e1.json");
 });
 
 test("customer notifier emails the customer for every status", async () => {
