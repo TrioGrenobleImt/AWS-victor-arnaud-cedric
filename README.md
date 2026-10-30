@@ -126,7 +126,7 @@ flowchart LR
     CFA -->|/admin/api/*| ALB
     subgraph VPC 10.10.0.0/16 — 2 AZs, public subnets
       ALB -->|default| T1[ECS shop-api ×2]
-      ALB -->|/admin/api/*| T2[ECS admin-api ×2]
+      ALB -->|/admin/api/*| T2[ECS admin-api]
       T1 & T2 -.- EC2[ECS capacity provider<br/>ASG 2× t3.micro, one per AZ]
     end
     ECR[(ECR)] -.->|image| T1 & T2
@@ -175,10 +175,11 @@ failed messages are retried 3 times and then moved to a dead-letter queue
 (which triggers a CloudWatch alarm).
 
 * **High availability**: 2 container instances, one per AZ, each running one
-  shop API and one admin API task behind the ALB (health checks on
-  `/api/health`, replaced automatically, deployment circuit breaker with
-  rollback), so losing a task, an instance or an AZ keeps both APIs up while
-  ECS and the ASG replace it; task auto scaling on CPU (60 %). DynamoDB, SQS,
+  shop API task behind the ALB (health checks on `/api/health`, replaced
+  automatically, deployment circuit breaker with rollback), so losing a task,
+  an instance or an AZ keeps the shop up while ECS and the ASG replace it; the
+  single admin API task is restarted on the other instance (the back office is
+  internal, a short outage is acceptable); task auto scaling on CPU (60 %). DynamoDB, SQS,
   SNS, Lambda, S3 and CloudFront are multi-AZ or global by design.
   `-var asg_min_size=1` stays fully Free Tier but makes the instance a single
   point of failure (a few minutes of 502/503 while the ASG replaces it).
@@ -290,7 +291,7 @@ CloudWatch dashboard: `terraform -chdir=infra output dashboard_url`.
 | Service | Usage | Free Tier coverage |
 |---|---|---|
 | EC2 t3.micro × 2 (ECS container instances, one per AZ) | ASG min 2 / max 2, 30 GB gp3 each, 1 public IPv4 each | 750 h/month, 30 GB EBS and 750 h of public IPv4 cover 1 instance; **the 2nd one is billed** (~15 USD/month for instance + disk + IP). `asg_min_size=1` stays free |
-| ECS | cluster, 2 services (shop ×2, admin ×2 tasks), capacity provider | no charge on EC2 |
+| ECS | cluster, 2 services (shop ×2, admin ×1 tasks), capacity provider | no charge on EC2 |
 | ECR | 1 repository, last 5 images | 500 MB/month (12 months) |
 | ALB | 1 ALB | 750 h + 15 LCU/month (12-month legacy Free Tier). **Its public IPv4 addresses are billed** (~0.005 USD/h each ≈ 0.25 USD/day) |
 | Lambda | 2–3 functions, arm64 128 MB | 1 M requests + 400 000 GB-s/month (always free) |

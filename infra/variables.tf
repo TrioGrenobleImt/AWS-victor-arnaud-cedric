@@ -72,9 +72,9 @@ variable "api_desired_count" {
 }
 
 variable "admin_desired_count" {
-  description = "Admin API tasks (internal traffic only). 2 keep the back office up when an instance or AZ fails."
+  description = "Admin API tasks (internal traffic only)."
   type        = number
-  default     = 2
+  default     = 1
 }
 
 variable "api_max_count" {
