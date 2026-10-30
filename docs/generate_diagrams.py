@@ -1,4 +1,10 @@
-"""Generates the architecture diagram (docs/architecture.svg) as a standalone SVG file."""
+"""Generates the architecture diagrams as standalone SVG files.
+
+docs/architecture.svg is the whole picture; the architecture-N-*.svg files zoom
+in on one part of it each (web entry, APIs, events, operations) so they can be
+read on their own.
+Usage: python3 docs/generate_diagrams.py docs
+"""
 import sys
 from html import escape
 
@@ -75,8 +81,14 @@ class Svg:
     def text(self, x, y, s, size=12, color="#414d5c", weight="400", anchor="start"):
         self.parts.append(f"<text x='{x}' y='{y}' font-size='{size}' font-weight='{weight}' fill='{color}' text-anchor='{anchor}'>{escape(s)}</text>")
 
-    def legend(self, y, steps):
+    def line(self, pts):
+        self.parts.append("<path d='" + " ".join(f"{'M' if i == 0 else 'L'}{x},{y}" for i, (x, y) in enumerate(pts))
+                          + "' fill='none' stroke='#414d5c' stroke-width='1.6'/>")
+
+    def legend(self, y, steps=(), note=None):
         self.parts.append(f"<line x1='30' y1='{y-18}' x2='{self.w-30}' y2='{y-18}' stroke='#e9ebed'/>")
+        if note:
+            self.text(30, y + 4, note, 12)
         x = 30
         for i, s in enumerate(steps, 1):
             self.badge(x + 10, y, i)
@@ -92,102 +104,271 @@ class Svg:
             f.write("\n".join(self.parts + self.labels + ["</svg>"]))
 
 
-s = Svg(1700, 1030, "FISA Shop — current architecture",
-        "ECS on EC2 for the shop and admin APIs, Lambda for event-driven work, CloudFront + S3 for both sites, Cognito, DynamoDB · Terraform · Free Tier")
+def overview():
+    s = Svg(1700, 1030, "FISA Shop — current architecture",
+            "ECS on EC2 for the shop and admin APIs, Lambda for event-driven work, CloudFront + S3 for both sites, Cognito, DynamoDB · Terraform · Free Tier")
 
 
-def line(pts):
-    s.parts.append("<path d='" + " ".join(f"{'M' if i == 0 else 'L'}{x},{y}" for i, (x, y) in enumerate(pts))
-                   + "' fill='none' stroke='#414d5c' stroke-width='1.6'/>")
+    # users and edge
+    s.node(10, 150, 170, 76, "Customers", ["web browser", "optional sign-in"], "user", "USR")
+    s.node(10, 420, 170, 76, "Back office", ["owner / staff", "hosted login (PKCE)"], "user", "USR")
+    s.node(190, 130, 210, 96, "CloudFront", ["storefront · HTTPS", "/ /images/* → S3", "/api/* → ALB"], "net", "CF")
+    s.node(190, 400, 210, 96, "CloudFront", ["back office · HTTPS", "/ /images/* → S3", "/admin/api/* → ALB"], "net", "CF")
+
+    s.group(430, 90, 1250, 860, "AWS Cloud · region eu-west-3 (Paris)", "#232F3E", icon="AWS")
+
+    # static content
+    s.node(460, 125, 200, 70, "S3 storefront", ["Vite build · private", "Origin Access Control"], "storage", "S3")
+    s.node(460, 290, 200, 96, "S3 images", ["product covers", "presigned POST uploads", "shared by both sites"], "storage", "S3")
+    s.node(460, 455, 200, 70, "S3 back office", ["Vite build · private", "Origin Access Control"], "storage", "S3")
+
+    # VPC: ALB + ECS on EC2
+    s.group(700, 110, 410, 310, "VPC 10.10.0.0/16 · 2 public subnets (2 AZs)", C["net"], icon="VPC")
+    s.node(720, 180, 370, 66, "Application Load Balancer", ["only reachable from CloudFront · health /api/health"], "net", "ALB")
+    s.parts.append(f"<rect x='715' y='268' width='380' height='140' fill='none' stroke='{C['compute']}' stroke-width='1.5' stroke-dasharray='6 4'/>")
+    s.node(725, 300, 178, 84, "shop-api", ["Express · ×2 tasks", "default listener rule", "task role: DDB, SNS"], "compute", "ECS")
+    s.node(910, 300, 178, 84, "admin-api", ["Express · ×1 task", "/admin/api/* rule", "checks Cognito JWT"], "compute", "ECS")
+    s.text(905, 400, "ECS cluster on EC2 · ASG t3.micro 1–2", 11.5, C["compute"], "700", "middle")
+
+    s.node(1150, 125, 260, 100, "Amazon Cognito", ["customers pool: sign in/up", "admins pool: hosted login", "groups: admins / owners"], "sec", "COG")
+
+    # supporting
+    s.node(460, 610, 200, 84, "Amazon ECR", ["API image (shop + admin)", "scan on push · immutable tags"], "compute", "ECR")
+    s.node(460, 740, 200, 84, "CloudWatch", ["logs · alarms · dashboard", "DLQ, 5xx, Lambda errors"], "mgmt", "CW")
+    s.node(460, 860, 200, 70, "Account baseline", ["CloudTrail → S3", "Budgets alert"], "mgmt", "AWS")
+
+    # data
+    s.node(700, 470, 210, 84, "DynamoDB products", ["catalog (back-office owned)", "atomic stock updates"], "db", "DDB")
+    s.node(950, 470, 210, 96, "DynamoDB orders", ["orders + status history", "by_month · by_customer", "stream NEW_AND_OLD"], "db", "DDB")
+    s.node(1210, 470, 210, 70, "SNS order-events", ["topic · encrypted"], "integ", "SNS")
+    s.node(1450, 470, 210, 70, "Shop owner", ["email subscription", "all order events"], "user", "@")
+
+    s.node(700, 610, 210, 70, "audit-stream", ["Lambda · stream consumer", "batch 25 · bisect on error"], "compute", "λ")
+    s.node(700, 740, 210, 84, "S3 audit", ["partitioned by date", "versioned · 90 d expiry"], "storage", "S3")
+    s.node(950, 740, 210, 84, "S3 documents", ["packing slips · private", "5-min presigned links"], "storage", "S3")
+    s.node(1210, 610, 210, 84, "SQS order-processing", ["filter: ORDER_PLACED", "DLQ after 3 tries"], "integ", "SQS")
+    s.node(1210, 740, 210, 96, "order-processor", ["Lambda · batch 5", "writes packing slip,", "links it to the order"], "compute", "λ")
+    s.node(1450, 610, 210, 84, "SQS customer-emails", ["all 4 order events", "own DLQ + alarm"], "integ", "SQS")
+    s.node(1450, 740, 210, 84, "customer-notifier", ["Lambda · batch 5", "emails the customer"], "compute", "λ")
+    s.node(1450, 860, 210, 70, "Amazon SES", ["sender identity"], "integ", "SES")
+
+    # edge flow
+    s.arrow([(180, 188), (190, 188)])
+    s.arrow([(180, 458), (190, 458)])
+    s.arrow([(400, 160), (460, 160)], "/", at=(430, 148))
+    s.arrow([(400, 205), (720, 205)], "/api/*", at=(560, 205))
+    s.arrow([(400, 222), (430, 222), (430, 325), (460, 325)], "/images/*", at=(430, 275))
+    s.arrow([(400, 470), (460, 470)], "/", at=(430, 458))
+    s.arrow([(400, 440), (445, 440), (445, 365), (460, 365)])
+    s.arrow([(400, 410), (670, 410), (670, 230), (720, 230)], "/admin/api/*", at=(540, 410))
+    s.arrow([(1095, 330), (1125, 330), (1125, 200), (1150, 200)], "verify JWT", dashed=True, at=(1125, 265))
+    s.arrow([(660, 645), (690, 645), (690, 340), (715, 340)], dashed=True)
+
+    # ALB -> services
+    s.arrow([(812, 246), (812, 300)], "/api/*", at=(812, 276))
+    s.arrow([(997, 246), (997, 300)], "/admin/api/*", at=(997, 276))
+
+    # services -> data and events (shared bus)
+    s.line([(760, 384), (760, 445)])
+    s.line([(1020, 384), (1020, 445)])
+    s.line([(760, 445), (1315, 445)])
+    s.arrow([(805, 445), (805, 470)])
+    s.arrow([(1055, 445), (1055, 470)])
+    s.arrow([(1315, 445), (1315, 470)])
+    s.label(900, 445, "read / write")
+    s.label(1215, 445, "publish events")
+
+    # event pipeline
+    s.arrow([(1420, 505), (1450, 505)])
+    s.arrow([(1055, 566), (1055, 590), (805, 590), (805, 610)], "stream", at=(930, 590))
+    s.arrow([(805, 680), (805, 740)], "JSON per change", at=(805, 710))
+    s.arrow([(1280, 540), (1280, 610)], "ORDER_PLACED", at=(1280, 575))
+    s.arrow([(1400, 540), (1400, 575), (1555, 575), (1555, 610)], "all events", at=(1480, 575))
+    s.arrow([(1315, 694), (1315, 740)])
+    s.arrow([(1555, 694), (1555, 740)])
+    s.arrow([(1555, 824), (1555, 860)])
+    s.arrow([(1210, 800), (1160, 800)])
+    s.arrow([(1210, 755), (1185, 755), (1185, 515), (1160, 515)], dashed=True)
+
+    s.badge(685, 205, 1)
+    s.badge(1330, 458, 2)
+    s.badge(1331, 718, 3)
+    s.badge(1572, 842, 4)
+    s.badge(880, 715, 5)
+    s.legend(1000, ["Browse & order via CloudFront", "Order stored, event published", "Queue → packing slip",
+                    "Customer email via SES", "Audit stream to S3"])
+    s.save("architecture.svg")
 
 
-# users and edge
-s.node(10, 150, 170, 76, "Customers", ["web browser", "optional sign-in"], "user", "USR")
-s.node(10, 420, 170, 76, "Back office", ["owner / staff", "hosted login (PKCE)"], "user", "USR")
-s.node(190, 130, 210, 96, "CloudFront", ["storefront · HTTPS", "/ /images/* → S3", "/api/* → ALB"], "net", "CF")
-s.node(190, 400, 210, 96, "CloudFront", ["back office · HTTPS", "/ /images/* → S3", "/admin/api/* → ALB"], "net", "CF")
 
-s.group(430, 90, 1250, 860, "AWS Cloud · region eu-west-3 (Paris)", "#232F3E", icon="AWS")
+def web():
+    s = Svg(1300, 650, "FISA Shop — 1 · web entry",
+            "Two CloudFront distributions, one per site: each serves its own S3 bucket, the shared images bucket and its API path")
+    s.node(30, 150, 170, 76, "Customers", ["web browser", "optional sign-in"], "user", "USR")
+    s.node(30, 420, 170, 76, "Back office", ["owner / staff", "uploads covers"], "user", "USR")
+    s.node(260, 130, 230, 96, "CloudFront", ["storefront · HTTPS", "default → S3 storefront", "/images/* · /api/*"], "net", "CF")
+    s.node(260, 400, 230, 96, "CloudFront", ["back office · HTTPS", "default → S3 back office", "/images/* · /admin/api/*"], "net", "CF")
 
-# static content
-s.node(460, 125, 200, 70, "S3 storefront", ["Vite build · private", "Origin Access Control"], "storage", "S3")
-s.node(460, 290, 200, 96, "S3 images", ["product covers", "presigned POST uploads", "shared by both sites"], "storage", "S3")
-s.node(460, 455, 200, 70, "S3 back office", ["Vite build · private", "Origin Access Control"], "storage", "S3")
+    s.group(540, 80, 740, 490, "AWS Cloud · region eu-west-3 (Paris)", "#232F3E", icon="AWS")
+    s.node(580, 110, 220, 70, "S3 storefront", ["Vite build · private", "config.json (sign-in)"], "storage", "S3")
+    s.node(580, 280, 220, 96, "S3 images", ["product covers · private", "read by both sites", "uploads/ ≤ 5 MB"], "storage", "S3")
+    s.node(580, 470, 220, 70, "S3 back office", ["Vite build · private", "config.json (login)"], "storage", "S3")
 
-# VPC: ALB + ECS on EC2
-s.group(700, 110, 410, 310, "VPC 10.10.0.0/16 · 2 public subnets (2 AZs)", C["net"], icon="VPC")
-s.node(720, 180, 370, 66, "Application Load Balancer", ["only reachable from CloudFront · health /api/health"], "net", "ALB")
-s.parts.append(f"<rect x='715' y='268' width='380' height='140' fill='none' stroke='{C['compute']}' stroke-width='1.5' stroke-dasharray='6 4'/>")
-s.node(725, 300, 178, 84, "shop-api", ["Express · ×2 tasks", "default listener rule", "task role: DDB, SNS"], "compute", "ECS")
-s.node(910, 300, 178, 84, "admin-api", ["Express · ×1 task", "/admin/api/* rule", "checks Cognito JWT"], "compute", "ECS")
-s.text(905, 400, "ECS cluster on EC2 · ASG t3.micro 1–2", 11.5, C["compute"], "700", "middle")
+    s.group(890, 120, 370, 420, "VPC · 2 public subnets", C["net"], icon="VPC")
+    s.node(920, 170, 310, 100, "Application Load Balancer", ["accepts only the CloudFront", "origin-facing prefix list", "API paths never cached"], "net", "ALB")
+    s.node(920, 440, 310, 70, "ECS services", ["shop-api · admin-api", "see 2 · APIs and sign-in"], "compute", "ECS", dashed=True)
 
-s.node(1150, 125, 260, 100, "Amazon Cognito", ["customers pool: sign in/up", "admins pool: hosted login", "groups: admins / owners"], "sec", "COG")
+    s.arrow([(200, 188), (260, 188)], "HTTPS", at=(230, 176))
+    s.arrow([(200, 458), (260, 458)], "HTTPS", at=(230, 446))
+    s.arrow([(490, 145), (580, 145)], "/", at=(535, 145))
+    s.arrow([(490, 200), (920, 200)], "/api/*", at=(850, 200))
+    s.arrow([(490, 220), (530, 220), (530, 310), (580, 310)], "/images/*", at=(530, 265))
+    s.arrow([(375, 400), (375, 366), (580, 366)], "/images/*", at=(470, 366))
+    s.arrow([(150, 420), (150, 340), (580, 340)], "presigned POST (covers)", at=(270, 340))
+    s.arrow([(490, 485), (580, 485)], "/", at=(535, 485))
+    s.arrow([(490, 420), (860, 420), (860, 245), (920, 245)], "/admin/api/*", at=(860, 330))
+    s.arrow([(1075, 270), (1075, 440)], "path rules", at=(1075, 355))
+    s.legend(620, note="Each site bucket is readable only by its own distribution, the images bucket by both (Origin Access Control).")
+    s.save("architecture-1-web.svg")
 
-# supporting
-s.node(460, 610, 200, 84, "Amazon ECR", ["API image (shop + admin)", "scan on push · lifecycle"], "compute", "ECR")
-s.node(460, 740, 200, 84, "CloudWatch", ["logs · alarms · dashboard", "DLQ, 5xx, Lambda errors"], "mgmt", "CW")
-s.node(460, 860, 200, 70, "Account baseline", ["CloudTrail → S3", "Budgets alert"], "mgmt", "AWS")
 
-# data
-s.node(700, 470, 210, 84, "DynamoDB products", ["catalog (back-office owned)", "atomic stock updates"], "db", "DDB")
-s.node(950, 470, 210, 96, "DynamoDB orders", ["orders + status history", "by_month · by_customer", "stream NEW_AND_OLD"], "db", "DDB")
-s.node(1210, 470, 210, 70, "SNS order-events", ["topic · encrypted"], "integ", "SNS")
-s.node(1450, 470, 210, 70, "Shop owner", ["email subscription", "all order events"], "user", "@")
+def apis():
+    s = Svg(1420, 870, "FISA Shop — 2 · APIs and sign-in",
+            "Both APIs run from one image on ECS (EC2 instances); each checks access tokens from its own Cognito user pool")
+    s.node(30, 140, 170, 76, "Customers", ["web browser", "optional sign-in"], "user", "USR")
+    s.node(30, 470, 170, 76, "Back office", ["owner / staff", "hosted login (PKCE)"], "user", "USR")
+    s.node(250, 110, 230, 96, "Cognito customers", ["sign in / sign up", "own page, Cognito API", "anyone can sign up"], "sec", "COG")
+    s.node(250, 300, 230, 96, "CloudFront", ["storefront: /api/*", "back office: /admin/api/*", "see 1 · web entry"], "net", "CF", dashed=True)
+    s.node(250, 500, 230, 96, "Cognito admins", ["hosted login (PKCE)", "groups: admins / owners", "no self sign-up"], "sec", "COG")
 
-s.node(700, 610, 210, 70, "audit-stream", ["Lambda · stream consumer", "batch 25 · bisect on error"], "compute", "λ")
-s.node(700, 740, 210, 84, "S3 audit", ["partitioned by date", "versioned · 90 d expiry"], "storage", "S3")
-s.node(950, 740, 210, 84, "S3 documents", ["packing slips · private", "5-min presigned links"], "storage", "S3")
-s.node(1210, 610, 210, 84, "SQS order-processing", ["filter: ORDER_PLACED", "DLQ after 3 tries"], "integ", "SQS")
-s.node(1210, 740, 210, 96, "order-processor", ["Lambda · batch 5", "writes packing slip,", "links it to the order"], "compute", "λ")
-s.node(1450, 610, 210, 84, "SQS customer-emails", ["all 4 order events", "own DLQ + alarm"], "integ", "SQS")
-s.node(1450, 740, 210, 84, "customer-notifier", ["Lambda · batch 5", "emails the customer"], "compute", "λ")
-s.node(1450, 860, 210, 70, "Amazon SES", ["sender identity"], "integ", "SES")
+    s.group(530, 120, 560, 520, "VPC 10.10.0.0/16 · 2 public subnets (2 AZs)", C["net"], icon="VPC")
+    s.node(560, 290, 200, 120, "ALB", ["only from CloudFront", "health /api/health", "dynamic host ports"], "net", "ALB")
+    s.parts.append(f"<rect x='800' y='140' width='230' height='470' fill='none' stroke='{C['compute']}' stroke-width='1.5' stroke-dasharray='6 4'/>")
+    s.text(915, 160, "ECS cluster on EC2", 11.5, C["compute"], "700", "middle")
+    s.node(815, 175, 200, 110, "shop-api", ["Express · 2–4 tasks", "CPU target 60 %", "customer token optional", "role: DDB, SNS"], "compute", "ECS")
+    s.node(815, 400, 200, 126, "admin-api", ["Express · 1 task", "requires admins group", "role: DDB, S3, SNS,", "Cognito (team page)"], "compute", "ECS")
+    s.text(915, 578, "ASG t3.micro · 1–2 instances", 11.5, "#5f6b7a", anchor="middle")
+    s.text(915, 595, "IMDSv2 hop limit 1 · no SSH", 11.5, "#5f6b7a", anchor="middle")
 
-# edge flow
-s.arrow([(180, 188), (190, 188)])
-s.arrow([(180, 458), (190, 458)])
-s.arrow([(400, 160), (460, 160)], "/", at=(430, 148))
-s.arrow([(400, 205), (720, 205)], "/api/*", at=(560, 205))
-s.arrow([(400, 222), (430, 222), (430, 325), (460, 325)], "/images/*", at=(430, 275))
-s.arrow([(400, 470), (460, 470)], "/", at=(430, 458))
-s.arrow([(400, 440), (445, 440), (445, 365), (460, 365)])
-s.arrow([(400, 410), (670, 410), (670, 230), (720, 230)], "/admin/api/*", at=(540, 410))
-s.arrow([(1095, 330), (1125, 330), (1125, 200), (1150, 200)], "verify JWT", dashed=True, at=(1125, 265))
-s.arrow([(660, 645), (690, 645), (690, 340), (715, 340)], dashed=True)
+    s.node(1140, 120, 250, 70, "DynamoDB products", ["catalog · atomic stock updates"], "db", "DDB")
+    s.node(1140, 210, 250, 96, "DynamoDB orders", ["orders + status history", "by_month · by_customer", "stream → 3 · events"], "db", "DDB")
+    s.node(1140, 326, 250, 84, "SNS order-events", ["shop: ORDER_PLACED", "admin: PACKED / SHIPPED / …"], "integ", "SNS")
+    s.node(1140, 430, 250, 70, "S3 images", ["covers: presigned POST", "issued by admin-api"], "storage", "S3")
+    s.node(1140, 530, 250, 70, "S3 documents", ["packing slips", "5-min presigned GET links"], "storage", "S3")
+    s.node(560, 700, 200, 84, "Amazon ECR", ["one image, two entry points", "scan on push"], "compute", "ECR")
 
-# ALB -> services
-s.arrow([(812, 246), (812, 300)], "/api/*", at=(812, 276))
-s.arrow([(997, 246), (997, 300)], "/admin/api/*", at=(997, 276))
+    # browsers
+    s.arrow([(200, 165), (250, 165)])
+    s.arrow([(200, 520), (250, 520)])
+    s.arrow([(115, 216), (115, 330), (250, 330)], "HTTPS", at=(180, 330))
+    s.arrow([(115, 470), (115, 370), (250, 370)], "HTTPS", at=(180, 370))
+    s.arrow([(480, 350), (560, 350)])
+    # ALB -> services
+    s.arrow([(660, 290), (660, 230), (815, 230)], "/api/* (default)", at=(737, 230))
+    s.arrow([(660, 410), (660, 460), (815, 460)], "/admin/api/*", at=(737, 460))
+    # token checks
+    s.arrow([(990, 175), (990, 100), (365, 100), (365, 110)], "verify customer token", dashed=True, at=(630, 100))
+    s.arrow([(830, 526), (830, 670), (365, 670), (365, 596)], "verify token · manage team", at=(600, 670))
+    s.arrow([(760, 742), (980, 742), (980, 610)], "pull image", dashed=True, at=(870, 742))
+    # services -> data (shared), admin-api -> S3
+    s.line([(1015, 230), (1105, 230)])
+    s.line([(1015, 420), (1105, 420)])
+    s.line([(1105, 155), (1105, 420)])
+    s.arrow([(1105, 155), (1140, 155)])
+    s.arrow([(1105, 258), (1140, 258)])
+    s.arrow([(1105, 368), (1140, 368)])
+    s.arrow([(1015, 465), (1140, 465)])
+    s.arrow([(1015, 505), (1100, 505), (1100, 565), (1140, 565)])
+    s.legend(840, note="Two user pools so a customer account can never reach the admin API · owners can also invite, disable and remove staff.")
+    s.save("architecture-2-apis.svg")
 
-# services -> data and events (shared bus)
-line([(760, 384), (760, 445)])
-line([(1020, 384), (1020, 445)])
-line([(760, 445), (1315, 445)])
-s.arrow([(805, 445), (805, 470)])
-s.arrow([(1055, 445), (1055, 470)])
-s.arrow([(1315, 445), (1315, 470)])
-s.label(900, 445, "read / write")
-s.label(1215, 445, "publish events")
 
-# event pipeline
-s.arrow([(1420, 505), (1450, 505)])
-s.arrow([(1055, 566), (1055, 590), (805, 590), (805, 610)], "stream", at=(930, 590))
-s.arrow([(805, 680), (805, 740)], "JSON per change", at=(805, 710))
-s.arrow([(1280, 540), (1280, 610)], "ORDER_PLACED", at=(1280, 575))
-s.arrow([(1400, 540), (1400, 575), (1555, 575), (1555, 610)], "all events", at=(1480, 575))
-s.arrow([(1315, 694), (1315, 740)])
-s.arrow([(1555, 694), (1555, 740)])
-s.arrow([(1555, 824), (1555, 860)])
-s.arrow([(1210, 800), (1160, 800)])
-s.arrow([(1210, 755), (1185, 755), (1185, 515), (1160, 515)], dashed=True)
+def events():
+    s = Svg(1420, 840, "FISA Shop — 3 · event-driven work",
+            "The APIs publish order events on SNS, queues feed the Lambdas, and every change to the orders table streams to the audit bucket")
+    s.group(20, 120, 230, 320, "ECS services", C["compute"], dash="6 4")
+    s.node(35, 160, 200, 84, "shop-api", ["POST /api/orders", "ORDER_PLACED"], "compute", "ECS")
+    s.node(35, 300, 200, 96, "admin-api", ["back office actions", "ORDER_PACKED · SHIPPED", "ORDER_CANCELLED"], "compute", "ECS")
+    s.node(310, 232, 210, 96, "SNS order-events", ["topic · encrypted (KMS)", "attribute event_type", "4 event types"], "integ", "SNS")
 
-s.badge(685, 205, 1)
-s.badge(1330, 458, 2)
-s.badge(1331, 718, 3)
-s.badge(1572, 842, 4)
-s.badge(880, 715, 5)
-s.legend(1000, ["Browse & order via CloudFront", "Order stored, event published", "Queue → packing slip",
-                "Customer email via SES", "Audit stream to S3"])
-s.save("architecture.svg")
+    s.node(610, 110, 230, 70, "Shop owner", ["email subscription", "every order event"], "user", "@")
+    s.node(610, 232, 230, 96, "SQS customer-emails", ["filter: all 4 events", "DLQ after 3 tries", "only with a sender email"], "integ", "SQS")
+    s.node(610, 380, 230, 96, "SQS order-processing", ["filter: ORDER_PLACED", "visibility 90 s", "DLQ after 3 tries"], "integ", "SQS")
+    s.node(900, 232, 220, 96, "customer-notifier", ["Lambda · batch 5", "one email per event"], "compute", "λ")
+    s.node(900, 380, 220, 96, "order-processor", ["Lambda · batch 5", "writes the packing slip,", "links it to the order"], "compute", "λ")
+    s.node(1180, 110, 200, 70, "Customer", ["placed · packed ·", "shipped · cancelled"], "user", "USR")
+    s.node(1180, 232, 200, 84, "Amazon SES", ["verified sender", "identity"], "integ", "SES")
+    s.node(1180, 380, 200, 96, "S3 documents", ["packing-slips/ · private", "90-day expiry"], "storage", "S3")
+
+    s.node(30, 640, 220, 96, "DynamoDB orders", ["orders + status history", "stream: new + old images"], "db", "DDB")
+    s.group(290, 610, 690, 150, "Audit trail · DynamoDB Stream → Lambda → S3", "#5f6b7a", dash="6 4")
+    s.node(360, 645, 220, 96, "audit-stream", ["Lambda · batch 25", "bisect batch on error", "starts at LATEST"], "compute", "λ")
+    s.node(700, 645, 250, 96, "S3 audit", ["orders/dt=YYYY-MM-DD/…", "versioned · 90-day expiry", "ready for Athena"], "storage", "S3")
+
+    s.arrow([(250, 280), (310, 280)], "publish", at=(280, 268))
+    s.line([(520, 280), (560, 280)])
+    s.line([(560, 145), (560, 428)])
+    s.arrow([(560, 145), (610, 145)])
+    s.arrow([(560, 280), (610, 280)])
+    s.arrow([(560, 428), (610, 428)])
+    s.arrow([(840, 280), (900, 280)])
+    s.arrow([(840, 428), (900, 428)])
+    s.arrow([(1120, 280), (1180, 280)])
+    s.arrow([(1280, 232), (1280, 180)])
+    s.arrow([(1120, 428), (1180, 428)])
+    s.arrow([(135, 440), (135, 640)], "store / update", at=(135, 530))
+    s.arrow([(1010, 476), (1010, 570), (200, 570), (200, 640)], "link packing slip", at=(600, 570))
+    s.arrow([(250, 688), (360, 688)], "stream", at=(305, 688))
+    s.arrow([(580, 693), (700, 693)], "JSON per change", at=(640, 693))
+    s.legend(810, note="Failed messages are retried 3 times, then land in the queue's DLQ, which raises a CloudWatch alarm (see 4 · operations).")
+    s.save("architecture-3-events.svg")
+
+
+def ops():
+    s = Svg(1400, 720, "FISA Shop — 4 · build, monitoring and guardrails",
+            "terraform apply builds and deploys everything; CloudWatch alarms, CloudTrail and a cost budget watch the account")
+    s.group(20, 100, 1360, 200, "Build and deploy", "#5f6b7a", dash="6 4")
+    s.node(40, 140, 230, 110, "Terraform", ["terraform apply", "docker buildx → push", "tag = hash of backend/"], "mgmt", "TF")
+    s.node(340, 140, 220, 96, "Amazon ECR", ["immutable tags", "scan on push"], "compute", "ECR")
+    s.node(630, 140, 230, 96, "ECS services", ["rolling deployment", "circuit breaker", "+ automatic rollback"], "compute", "ECS")
+    s.node(920, 140, 210, 96, "Lambda functions", ["3 zips: function", "+ shared lib/", "one IAM role each"], "compute", "λ")
+    s.node(1160, 140, 200, 96, "S3 site buckets", ["storefront and back", "office dist/ uploads"], "storage", "S3")
+    s.arrow([(270, 188), (340, 188)], "push", at=(305, 176))
+    s.arrow([(560, 188), (630, 188)], "pull", at=(595, 176))
+    s.line([(155, 250), (155, 275), (1260, 275)])
+    s.arrow([(1025, 275), (1025, 236)])
+    s.arrow([(1260, 275), (1260, 236)])
+    s.label(700, 275, "Lambda zips · built sites")
+
+    s.group(20, 330, 860, 300, "Monitoring", C["mgmt"], dash="6 4")
+    s.node(40, 370, 230, 84, "ALB · ECS services", ["requests · 5xx · CPU", "healthy tasks · logs"], "net", "ALB")
+    s.node(40, 470, 230, 70, "Lambda functions", ["invocations · errors · logs"], "compute", "λ")
+    s.node(40, 555, 230, 60, "SQS dead-letter queues", ["messages visible"], "integ", "SQS")
+    s.node(340, 365, 270, 160, "CloudWatch", ["logs · 7-day retention", "dashboard · 5 widgets", "alarms:", "• DLQ not empty (×2)",
+                                              "• Lambda errors (each)", "• API 5xx > 5 in 5 min", "• unhealthy shop-api task"], "mgmt", "CW")
+    s.node(670, 380, 190, 70, "SNS alerts", ["alarm actions"], "integ", "SNS")
+    s.node(670, 520, 190, 70, "Operator", ["notification_email"], "user", "@")
+    s.line([(270, 412), (305, 412)])
+    s.line([(270, 505), (305, 505)])
+    s.line([(270, 585), (305, 585)])
+    s.line([(305, 412), (305, 585)])
+    s.arrow([(305, 445), (340, 445)])
+    s.arrow([(610, 415), (670, 415)], "ALARM", at=(640, 403))
+    s.arrow([(765, 450), (765, 520)], "email", at=(765, 485))
+
+    s.group(900, 330, 480, 300, "Account guardrails", C["sec"], dash="6 4")
+    s.node(920, 370, 210, 96, "CloudTrail", ["every API call", "all regions", "log file validation"], "mgmt", "CT")
+    s.node(1160, 370, 200, 84, "S3 trail", ["private", "30-day expiry"], "storage", "S3")
+    s.node(920, 510, 210, 96, "AWS Budgets", ["monthly cost budget", "alert at 80 % actual", "and 100 % forecast"], "mgmt", "$")
+    s.arrow([(1130, 412), (1160, 412)])
+    s.arrow([(920, 555), (860, 555)])
+    s.legend(690, note="CloudTrail can be turned off with enable_cloudtrail = false · the budget and email alerts need notification_email.")
+    s.save("architecture-4-ops.svg")
+
+
+overview()
+web()
+apis()
+events()
+ops()
 print("ok")

@@ -54,7 +54,7 @@ Both APIs and the Lambdas use the same code for the order domain
 │   ├── lambda.tf             #   Lambda functions + triggers
 │   ├── dynamodb.tf, messaging.tf, storage.tf, cdn.tf, monitoring.tf
 ├── tests/                    # test.sh (end to end), failover.sh
-└── docs/                     # Architecture diagram (architecture.svg, regenerate with generate_diagrams.py)
+└── docs/                     # Architecture diagrams (overview + 4 sections, regenerate with generate_diagrams.py)
 ```
 
 ## Addresses and API
@@ -103,6 +103,16 @@ Back-office API (`Authorization: Bearer <Cognito access token>`, `admins` group)
 | POST   | `/admin/api/orders/{id}/status`    | `PACKED`, `SHIPPED` (+ tracking number) or `CANCELLED` (restocks) |
 
 ## Architecture
+
+The full picture is [docs/architecture.svg](docs/architecture.svg); four
+smaller diagrams each zoom in on one part of it:
+
+| Diagram | Shows |
+|---|---|
+| [1 · web entry](docs/architecture-1-web.svg) | The two CloudFront distributions, the S3 buckets they serve and the path to the ALB |
+| [2 · APIs and sign-in](docs/architecture-2-apis.svg) | ALB, shop-api and admin-api on ECS, the two Cognito user pools, what each API reads and writes |
+| [3 · event-driven work](docs/architecture-3-events.svg) | SNS fan-out, the SQS queues and Lambdas (packing slip, customer emails) and the audit trail |
+| [4 · build, monitoring and guardrails](docs/architecture-4-ops.svg) | Image build and deploy, CloudWatch alarms, CloudTrail and the cost budget |
 
 ```mermaid
 flowchart LR

@@ -1,0 +1,99 @@
+<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1420 840' width='1420' height='840' font-family='Helvetica, Arial, sans-serif'>
+<defs><marker id='a' viewBox='0 0 10 10' refX='9' refY='5' markerWidth='7' markerHeight='7' orient='auto-start-reverse'><path d='M0,0 L10,5 L0,10 z' fill='#414d5c'/></marker><marker id='ad' viewBox='0 0 10 10' refX='9' refY='5' markerWidth='7' markerHeight='7' orient='auto-start-reverse'><path d='M0,0 L10,5 L0,10 z' fill='#8d99a8'/></marker></defs>
+<rect width='1420' height='840' fill='#ffffff'/>
+<text x='30' y='42' font-size='24' font-weight='700' fill='#16191f'>FISA Shop — 3 · event-driven work</text>
+<text x='30' y='66' font-size='14' fill='#5f6b7a'>The APIs publish order events on SNS, queues feed the Lambdas, and every change to the orders table streams to the audit bucket</text>
+<rect x='20' y='120' width='230' height='320' fill='none' stroke='#ED7100' stroke-width='1.5' stroke-dasharray='6 4'/>
+<text x='30' y='138' font-size='13' font-weight='700' fill='#ED7100'>ECS services</text>
+<g><rect x='35' y='160' width='200' height='84' rx='6' fill='#fff' stroke='#ED7100' stroke-width='1.6'/><rect x='45' y='172' width='34' height='34' rx='4' fill='#ED7100'/><text x='62' y='193' font-size='10.5' font-weight='700' fill='#fff' text-anchor='middle'>ECS</text><text x='87' y='186' font-size='13.5' font-weight='700' fill='#16191f'>shop-api</text>
+<text x='87' y='203' font-size='11.5' fill='#5f6b7a'>POST /api/orders</text>
+<text x='87' y='218' font-size='11.5' fill='#5f6b7a'>ORDER_PLACED</text>
+</g>
+<g><rect x='35' y='300' width='200' height='96' rx='6' fill='#fff' stroke='#ED7100' stroke-width='1.6'/><rect x='45' y='312' width='34' height='34' rx='4' fill='#ED7100'/><text x='62' y='333' font-size='10.5' font-weight='700' fill='#fff' text-anchor='middle'>ECS</text><text x='87' y='326' font-size='13.5' font-weight='700' fill='#16191f'>admin-api</text>
+<text x='87' y='343' font-size='11.5' fill='#5f6b7a'>back office actions</text>
+<text x='87' y='358' font-size='11.5' fill='#5f6b7a'>ORDER_PACKED · SHIPPED</text>
+<text x='87' y='373' font-size='11.5' fill='#5f6b7a'>ORDER_CANCELLED</text>
+</g>
+<g><rect x='310' y='232' width='210' height='96' rx='6' fill='#fff' stroke='#E7157B' stroke-width='1.6'/><rect x='320' y='244' width='34' height='34' rx='4' fill='#E7157B'/><text x='337' y='265' font-size='10.5' font-weight='700' fill='#fff' text-anchor='middle'>SNS</text><text x='362' y='258' font-size='13.5' font-weight='700' fill='#16191f'>SNS order-events</text>
+<text x='362' y='275' font-size='11.5' fill='#5f6b7a'>topic · encrypted (KMS)</text>
+<text x='362' y='290' font-size='11.5' fill='#5f6b7a'>attribute event_type</text>
+<text x='362' y='305' font-size='11.5' fill='#5f6b7a'>4 event types</text>
+</g>
+<g><rect x='610' y='110' width='230' height='70' rx='6' fill='#fff' stroke='#232F3E' stroke-width='1.6'/><rect x='620' y='122' width='34' height='34' rx='4' fill='#232F3E'/><text x='637' y='143' font-size='10.5' font-weight='700' fill='#fff' text-anchor='middle'>@</text><text x='662' y='136' font-size='13.5' font-weight='700' fill='#16191f'>Shop owner</text>
+<text x='662' y='153' font-size='11.5' fill='#5f6b7a'>email subscription</text>
+<text x='662' y='168' font-size='11.5' fill='#5f6b7a'>every order event</text>
+</g>
+<g><rect x='610' y='232' width='230' height='96' rx='6' fill='#fff' stroke='#E7157B' stroke-width='1.6'/><rect x='620' y='244' width='34' height='34' rx='4' fill='#E7157B'/><text x='637' y='265' font-size='10.5' font-weight='700' fill='#fff' text-anchor='middle'>SQS</text><text x='662' y='258' font-size='13.5' font-weight='700' fill='#16191f'>SQS customer-emails</text>
+<text x='662' y='275' font-size='11.5' fill='#5f6b7a'>filter: all 4 events</text>
+<text x='662' y='290' font-size='11.5' fill='#5f6b7a'>DLQ after 3 tries</text>
+<text x='662' y='305' font-size='11.5' fill='#5f6b7a'>only with a sender email</text>
+</g>
+<g><rect x='610' y='380' width='230' height='96' rx='6' fill='#fff' stroke='#E7157B' stroke-width='1.6'/><rect x='620' y='392' width='34' height='34' rx='4' fill='#E7157B'/><text x='637' y='413' font-size='10.5' font-weight='700' fill='#fff' text-anchor='middle'>SQS</text><text x='662' y='406' font-size='13.5' font-weight='700' fill='#16191f'>SQS order-processing</text>
+<text x='662' y='423' font-size='11.5' fill='#5f6b7a'>filter: ORDER_PLACED</text>
+<text x='662' y='438' font-size='11.5' fill='#5f6b7a'>visibility 90 s</text>
+<text x='662' y='453' font-size='11.5' fill='#5f6b7a'>DLQ after 3 tries</text>
+</g>
+<g><rect x='900' y='232' width='220' height='96' rx='6' fill='#fff' stroke='#ED7100' stroke-width='1.6'/><rect x='910' y='244' width='34' height='34' rx='4' fill='#ED7100'/><text x='927' y='265' font-size='10.5' font-weight='700' fill='#fff' text-anchor='middle'>λ</text><text x='952' y='258' font-size='13.5' font-weight='700' fill='#16191f'>customer-notifier</text>
+<text x='952' y='275' font-size='11.5' fill='#5f6b7a'>Lambda · batch 5</text>
+<text x='952' y='290' font-size='11.5' fill='#5f6b7a'>one email per event</text>
+</g>
+<g><rect x='900' y='380' width='220' height='96' rx='6' fill='#fff' stroke='#ED7100' stroke-width='1.6'/><rect x='910' y='392' width='34' height='34' rx='4' fill='#ED7100'/><text x='927' y='413' font-size='10.5' font-weight='700' fill='#fff' text-anchor='middle'>λ</text><text x='952' y='406' font-size='13.5' font-weight='700' fill='#16191f'>order-processor</text>
+<text x='952' y='423' font-size='11.5' fill='#5f6b7a'>Lambda · batch 5</text>
+<text x='952' y='438' font-size='11.5' fill='#5f6b7a'>writes the packing slip,</text>
+<text x='952' y='453' font-size='11.5' fill='#5f6b7a'>links it to the order</text>
+</g>
+<g><rect x='1180' y='110' width='200' height='70' rx='6' fill='#fff' stroke='#232F3E' stroke-width='1.6'/><rect x='1190' y='122' width='34' height='34' rx='4' fill='#232F3E'/><text x='1207' y='143' font-size='10.5' font-weight='700' fill='#fff' text-anchor='middle'>USR</text><text x='1232' y='136' font-size='13.5' font-weight='700' fill='#16191f'>Customer</text>
+<text x='1232' y='153' font-size='11.5' fill='#5f6b7a'>placed · packed ·</text>
+<text x='1232' y='168' font-size='11.5' fill='#5f6b7a'>shipped · cancelled</text>
+</g>
+<g><rect x='1180' y='232' width='200' height='84' rx='6' fill='#fff' stroke='#E7157B' stroke-width='1.6'/><rect x='1190' y='244' width='34' height='34' rx='4' fill='#E7157B'/><text x='1207' y='265' font-size='10.5' font-weight='700' fill='#fff' text-anchor='middle'>SES</text><text x='1232' y='258' font-size='13.5' font-weight='700' fill='#16191f'>Amazon SES</text>
+<text x='1232' y='275' font-size='11.5' fill='#5f6b7a'>verified sender</text>
+<text x='1232' y='290' font-size='11.5' fill='#5f6b7a'>identity</text>
+</g>
+<g><rect x='1180' y='380' width='200' height='96' rx='6' fill='#fff' stroke='#7AA116' stroke-width='1.6'/><rect x='1190' y='392' width='34' height='34' rx='4' fill='#7AA116'/><text x='1207' y='413' font-size='10.5' font-weight='700' fill='#fff' text-anchor='middle'>S3</text><text x='1232' y='406' font-size='13.5' font-weight='700' fill='#16191f'>S3 documents</text>
+<text x='1232' y='423' font-size='11.5' fill='#5f6b7a'>packing-slips/ · private</text>
+<text x='1232' y='438' font-size='11.5' fill='#5f6b7a'>90-day expiry</text>
+</g>
+<g><rect x='30' y='640' width='220' height='96' rx='6' fill='#fff' stroke='#C925D1' stroke-width='1.6'/><rect x='40' y='652' width='34' height='34' rx='4' fill='#C925D1'/><text x='57' y='673' font-size='10.5' font-weight='700' fill='#fff' text-anchor='middle'>DDB</text><text x='82' y='666' font-size='13.5' font-weight='700' fill='#16191f'>DynamoDB orders</text>
+<text x='82' y='683' font-size='11.5' fill='#5f6b7a'>orders + status history</text>
+<text x='82' y='698' font-size='11.5' fill='#5f6b7a'>stream: new + old images</text>
+</g>
+<rect x='290' y='610' width='690' height='150' fill='none' stroke='#5f6b7a' stroke-width='1.5' stroke-dasharray='6 4'/>
+<text x='300' y='628' font-size='13' font-weight='700' fill='#5f6b7a'>Audit trail · DynamoDB Stream → Lambda → S3</text>
+<g><rect x='360' y='645' width='220' height='96' rx='6' fill='#fff' stroke='#ED7100' stroke-width='1.6'/><rect x='370' y='657' width='34' height='34' rx='4' fill='#ED7100'/><text x='387' y='678' font-size='10.5' font-weight='700' fill='#fff' text-anchor='middle'>λ</text><text x='412' y='671' font-size='13.5' font-weight='700' fill='#16191f'>audit-stream</text>
+<text x='412' y='688' font-size='11.5' fill='#5f6b7a'>Lambda · batch 25</text>
+<text x='412' y='703' font-size='11.5' fill='#5f6b7a'>bisect batch on error</text>
+<text x='412' y='718' font-size='11.5' fill='#5f6b7a'>starts at LATEST</text>
+</g>
+<g><rect x='700' y='645' width='250' height='96' rx='6' fill='#fff' stroke='#7AA116' stroke-width='1.6'/><rect x='710' y='657' width='34' height='34' rx='4' fill='#7AA116'/><text x='727' y='678' font-size='10.5' font-weight='700' fill='#fff' text-anchor='middle'>S3</text><text x='752' y='671' font-size='13.5' font-weight='700' fill='#16191f'>S3 audit</text>
+<text x='752' y='688' font-size='11.5' fill='#5f6b7a'>orders/dt=YYYY-MM-DD/…</text>
+<text x='752' y='703' font-size='11.5' fill='#5f6b7a'>versioned · 90-day expiry</text>
+<text x='752' y='718' font-size='11.5' fill='#5f6b7a'>ready for Athena</text>
+</g>
+<path d='M250,280 L310,280' fill='none' stroke='#414d5c' stroke-width='1.6' marker-end='url(#a)'/>
+<path d='M520,280 L560,280' fill='none' stroke='#414d5c' stroke-width='1.6'/>
+<path d='M560,145 L560,428' fill='none' stroke='#414d5c' stroke-width='1.6'/>
+<path d='M560,145 L610,145' fill='none' stroke='#414d5c' stroke-width='1.6' marker-end='url(#a)'/>
+<path d='M560,280 L610,280' fill='none' stroke='#414d5c' stroke-width='1.6' marker-end='url(#a)'/>
+<path d='M560,428 L610,428' fill='none' stroke='#414d5c' stroke-width='1.6' marker-end='url(#a)'/>
+<path d='M840,280 L900,280' fill='none' stroke='#414d5c' stroke-width='1.6' marker-end='url(#a)'/>
+<path d='M840,428 L900,428' fill='none' stroke='#414d5c' stroke-width='1.6' marker-end='url(#a)'/>
+<path d='M1120,280 L1180,280' fill='none' stroke='#414d5c' stroke-width='1.6' marker-end='url(#a)'/>
+<path d='M1280,232 L1280,180' fill='none' stroke='#414d5c' stroke-width='1.6' marker-end='url(#a)'/>
+<path d='M1120,428 L1180,428' fill='none' stroke='#414d5c' stroke-width='1.6' marker-end='url(#a)'/>
+<path d='M135,440 L135,640' fill='none' stroke='#414d5c' stroke-width='1.6' marker-end='url(#a)'/>
+<path d='M1010,476 L1010,570 L200,570 L200,640' fill='none' stroke='#414d5c' stroke-width='1.6' marker-end='url(#a)'/>
+<path d='M250,688 L360,688' fill='none' stroke='#414d5c' stroke-width='1.6' marker-end='url(#a)'/>
+<path d='M580,693 L700,693' fill='none' stroke='#414d5c' stroke-width='1.6' marker-end='url(#a)'/>
+<line x1='30' y1='792' x2='1390' y2='792' stroke='#e9ebed'/>
+<text x='30' y='814' font-size='12' font-weight='400' fill='#414d5c' text-anchor='start'>Failed messages are retried 3 times, then land in the queue&#x27;s DLQ, which raises a CloudWatch alarm (see 4 · operations).</text>
+<path d='M1090,810 L1130,810' stroke='#414d5c' stroke-width='1.6' marker-end='url(#a)'/>
+<text x='1138' y='814' font-size='12' font-weight='400' fill='#414d5c' text-anchor='start'>request / event</text>
+<path d='M1250,810 L1290,810' stroke='#8d99a8' stroke-width='1.6' stroke-dasharray='6 4' marker-end='url(#ad)'/>
+<text x='1298' y='814' font-size='12' font-weight='400' fill='#414d5c' text-anchor='start'>config / optional</text>
+<rect x='253.44' y='259' width='53.120000000000005' height='17' rx='3' fill='#fff' stroke='#d5dbe1'/><text x='280' y='272' font-size='11' fill='#414d5c' text-anchor='middle'>publish</text>
+<rect x='86.88' y='521' width='96.24000000000001' height='17' rx='3' fill='#fff' stroke='#d5dbe1'/><text x='135' y='534' font-size='11' fill='#414d5c' text-anchor='middle'>store / update</text>
+<rect x='542.64' y='561' width='114.72000000000001' height='17' rx='3' fill='#fff' stroke='#d5dbe1'/><text x='600' y='574' font-size='11' fill='#414d5c' text-anchor='middle'>link packing slip</text>
+<rect x='281.52' y='679' width='46.96' height='17' rx='3' fill='#fff' stroke='#d5dbe1'/><text x='305' y='692' font-size='11' fill='#414d5c' text-anchor='middle'>stream</text>
+<rect x='588.8' y='684' width='102.4' height='17' rx='3' fill='#fff' stroke='#d5dbe1'/><text x='640' y='697' font-size='11' fill='#414d5c' text-anchor='middle'>JSON per change</text>
+</svg>
