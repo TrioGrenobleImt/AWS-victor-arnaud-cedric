@@ -128,7 +128,7 @@ def overview():
     s.parts.append(f"<rect x='715' y='268' width='380' height='140' fill='none' stroke='{C['compute']}' stroke-width='1.5' stroke-dasharray='6 4'/>")
     s.node(725, 300, 178, 84, "shop-api", ["Express · ×2 tasks", "default listener rule", "task role: DDB, SNS"], "compute", "ECS")
     s.node(910, 300, 178, 84, "admin-api", ["Express · ×1 task", "/admin/api/* rule", "checks Cognito JWT"], "compute", "ECS")
-    s.text(905, 400, "ECS cluster on EC2 · ASG t3.micro 1–2", 11.5, C["compute"], "700", "middle")
+    s.text(905, 400, "ECS cluster on EC2 · ASG 2× t3.micro, 1 per AZ", 11.5, C["compute"], "700", "middle")
 
     s.node(1150, 125, 260, 100, "Amazon Cognito", ["customers pool: sign in/up", "admins pool: hosted login", "groups: admins / owners"], "sec", "COG")
 
@@ -247,7 +247,7 @@ def apis():
     s.text(915, 160, "ECS cluster on EC2", 11.5, C["compute"], "700", "middle")
     s.node(815, 175, 200, 110, "shop-api", ["Express · 2–4 tasks", "CPU target 60 %", "customer token optional", "role: DDB, SNS"], "compute", "ECS")
     s.node(815, 400, 200, 126, "admin-api", ["Express · 1 task", "requires admins group", "role: DDB, S3, SNS,", "Cognito (team page)"], "compute", "ECS")
-    s.text(915, 578, "ASG t3.micro · 1–2 instances", 11.5, "#5f6b7a", anchor="middle")
+    s.text(915, 578, "ASG 2× t3.micro · 1 per AZ", 11.5, "#5f6b7a", anchor="middle")
     s.text(915, 595, "IMDSv2 hop limit 1 · no SSH", 11.5, "#5f6b7a", anchor="middle")
 
     s.node(1140, 120, 250, 70, "DynamoDB products", ["catalog · atomic stock updates"], "db", "DDB")
