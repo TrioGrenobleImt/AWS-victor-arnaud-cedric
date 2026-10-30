@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Resilience scenario: stop one shop API task and watch ECS replace it while
 # the other task keeps serving through the ALB.
-# For instance-level failover, deploy with -var asg_min_size=2 and terminate an
-# instance instead: the capacity provider + ASG replace it.
+# For instance-level failover, terminate one of the 2 instances instead: the
+# tasks in the other AZ keep serving while the ASG replaces it.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 

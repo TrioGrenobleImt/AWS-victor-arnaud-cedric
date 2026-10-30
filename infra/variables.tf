@@ -32,7 +32,7 @@ variable "admin_email" {
 variable "monthly_budget_usd" {
   description = "Monthly cost budget. Alerts fire at 80% (actual) and 100% (forecast). Needs notification_email."
   type        = number
-  default     = 1
+  default     = 25
 }
 
 variable "enable_cloudtrail" {
@@ -54,9 +54,9 @@ variable "instance_type" {
 }
 
 variable "asg_min_size" {
-  description = "Minimum container instances. 1 stays within the 750 h/month Free Tier; 2 spreads tasks over 2 AZs (high availability)."
+  description = "Minimum container instances. 2 spreads tasks over 2 AZs (high availability; the 750 h/month Free Tier covers 1 of them); 1 stays fully free."
   type        = number
-  default     = 1
+  default     = 2
 }
 
 variable "asg_max_size" {
@@ -72,9 +72,9 @@ variable "api_desired_count" {
 }
 
 variable "admin_desired_count" {
-  description = "Admin API tasks (internal traffic only)."
+  description = "Admin API tasks (internal traffic only). 2 keep the back office up when an instance or AZ fails."
   type        = number
-  default     = 1
+  default     = 2
 }
 
 variable "api_max_count" {

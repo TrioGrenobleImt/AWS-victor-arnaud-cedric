@@ -116,8 +116,8 @@ flowchart LR
     CFA -->|/admin/api/*| ALB
     subgraph VPC 10.10.0.0/16 — 2 AZs, public subnets
       ALB -->|default| T1[ECS shop-api ×2]
-      ALB -->|/admin/api/*| T2[ECS admin-api]
-      T1 & T2 -.- EC2[ECS capacity provider<br/>ASG t3.micro 1–2]
+      ALB -->|/admin/api/*| T2[ECS admin-api ×2]
+      T1 & T2 -.- EC2[ECS capacity provider<br/>ASG 2× t3.micro, one per AZ]
     end
     ECR[(ECR)] -.->|image| T1 & T2
     T2 -.->|verify JWT| COG
@@ -164,12 +164,14 @@ SNS message filtering keeps `ORDER_PACKED`, `ORDER_SHIPPED` and `ORDER_CANCELLED
 failed messages are retried 3 times and then moved to a dead-letter queue
 (which triggers a CloudWatch alarm).
 
-* **High availability**: 2 API tasks behind the ALB (health checks on
+* **High availability**: 2 container instances, one per AZ, each running one
+  shop API and one admin API task behind the ALB (health checks on
   `/api/health`, replaced automatically, deployment circuit breaker with
-  rollback); tasks spread across AZs when 2 instances run
-  (`-var asg_min_size=2`); task auto scaling on CPU (60 %) and the ECS capacity
-  provider adds an instance when tasks no longer fit. DynamoDB, SQS, SNS,
-  Lambda, S3 and CloudFront are multi-AZ or global by design.
+  rollback), so losing a task, an instance or an AZ keeps both APIs up while
+  ECS and the ASG replace it; task auto scaling on CPU (60 %). DynamoDB, SQS,
+  SNS, Lambda, S3 and CloudFront are multi-AZ or global by design.
+  `-var asg_min_size=1` stays fully Free Tier but makes the instance a single
+  point of failure (a few minutes of 502/503 while the ASG replaces it).
 * **Streaming**: DynamoDB Streams → Lambda replaces Kafka/MSK at zero cost; the
   audit bucket is partitioned by date (`orders/dt=YYYY-MM-DD/…`) so it can be
   queried with Athena for reporting.
@@ -277,8 +279,8 @@ CloudWatch dashboard: `terraform -chdir=infra output dashboard_url`.
 
 | Service | Usage | Free Tier coverage |
 |---|---|---|
-| EC2 t3.micro × 1–2 (ECS container instances) | ASG min 1 / max 2, 30 GB gp3 | 750 h/month covers 1 instance full time; the 2nd one only runs when tasks no longer fit (or with `asg_min_size=2`) |
-| ECS | cluster, 2 services (shop ×2, admin ×1 tasks), capacity provider | no charge on EC2; all tasks fit on one t3.micro |
+| EC2 t3.micro × 2 (ECS container instances, one per AZ) | ASG min 2 / max 2, 30 GB gp3 each, 1 public IPv4 each | 750 h/month, 30 GB EBS and 750 h of public IPv4 cover 1 instance; **the 2nd one is billed** (~15 USD/month for instance + disk + IP). `asg_min_size=1` stays free |
+| ECS | cluster, 2 services (shop ×2, admin ×2 tasks), capacity provider | no charge on EC2 |
 | ECR | 1 repository, last 5 images | 500 MB/month (12 months) |
 | ALB | 1 ALB | 750 h + 15 LCU/month (12-month legacy Free Tier). **Its public IPv4 addresses are billed** (~0.005 USD/h each ≈ 0.25 USD/day) |
 | Lambda | 2–3 functions, arm64 128 MB | 1 M requests + 400 000 GB-s/month (always free) |

@@ -2,6 +2,6 @@ region             = "eu-west-3"
 notification_email = "you@example.com"
 sender_email       = "shop@example.com"
 admin_email        = "you@example.com"
-monthly_budget_usd = 1
+monthly_budget_usd = 25
 enable_cloudtrail  = true
-asg_min_size       = 1
+asg_min_size       = 2 # 1 = fully Free Tier, no instance/AZ failover
