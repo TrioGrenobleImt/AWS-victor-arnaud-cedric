@@ -117,7 +117,7 @@ flowchart LR
     subgraph VPC 10.10.0.0/16 — 2 AZs, public subnets
       ALB -->|default| T1[ECS shop-api ×2]
       ALB -->|/admin/api/*| T2[ECS admin-api]
-      T1 & T2 -.- EC2[ECS capacity provider<br/>ASG t3.micro 1–2]
+      T1 & T2 -.- EC2[ECS capacity provider<br/>ASG t3.micro ×2]
     end
     ECR[(ECR)] -.->|image| T1 & T2
     T2 -.->|verify JWT| COG
@@ -127,7 +127,7 @@ flowchart LR
     T1 & T2 -->|publish| SNS[SNS order-events]
     SNS --> SQS[SQS + DLQ] --> L1[λ order-processor] --> S3D[(S3 documents<br/>packing slips)]
     L1 --> OT
-    SNS --> Mail[Email]
+    SNS --> SQS2[SQS customer-emails + DLQ] --> L3[λ customer-notifier] --> SES[SES email<br/>to the customer]
     OT -->|DynamoDB Stream| L2[λ audit-stream] --> S3A[(S3 audit<br/>versioned, 90 d)]
 ```
 
@@ -143,19 +143,19 @@ sequenceDiagram
     participant W as λ order-processor
     participant A as λ audit-stream → S3
     participant B as Admin (back office → admin API)
-    participant M as Email subscriber
+    participant M as λ customer-notifier → SES
 
     C->>API: POST /api/orders
     API->>DB: transaction: store order (ORDERED) + take stock
     API->>SNS: publish ORDER_PLACED
     API-->>C: 201 confirmation (real time)
     DB-->>A: stream INSERT
-    SNS->>M: "Thank you for your order" email
+    SNS->>M: via SQS customer-emails: "Thank you for your order" email to the customer
     SNS->>Q: filter policy event_type = ORDER_PLACED
     Q->>W: consume
     W->>DB: packing slip in S3, linked to the order
     B->>DB: PACKED, then SHIPPED + tracking (conditional writes)
-    B->>SNS: ORDER_PACKED / ORDER_SHIPPED (owner email + customer-emails queue, filtered out of the processing queue)
+    B->>SNS: ORDER_PACKED / ORDER_SHIPPED (customer-emails queue, filtered out of the processing queue)
     DB-->>A: stream MODIFY ×2
     C->>API: GET /api/orders/{id} (polling every 5 s)
 ```
@@ -166,8 +166,8 @@ failed messages are retried 3 times and then moved to a dead-letter queue
 
 * **High availability**: 2 API tasks behind the ALB (health checks on
   `/api/health`, replaced automatically, deployment circuit breaker with
-  rollback); tasks spread across AZs when 2 instances run
-  (`-var asg_min_size=2`); task auto scaling on CPU (60 %) and the ECS capacity
+  rollback); 2 container instances in 2 AZs behind the ALB, tasks spread across
+  them (`asg_min_size=1` halves the EC2 cost); task auto scaling on CPU (60 %) and the ECS capacity
   provider adds an instance when tasks no longer fit. DynamoDB, SQS, SNS,
   Lambda, S3 and CloudFront are multi-AZ or global by design.
 * **Streaming**: DynamoDB Streams → Lambda replaces Kafka/MSK at zero cost; the
@@ -220,7 +220,7 @@ also manage accounts (invite, change role, disable, remove). Roles are the
 `admins` Cognito group (everyone) plus `owners`; owners can't change or remove
 their own account, so one owner always remains.
 Confirm the SNS subscription emails ("AWS Notification - Subscription
-Confirmation") to receive order confirmations and alarms. After the first
+Confirmation") to receive budget alerts and alarms. After the first
 apply, the container instance needs 2–3 minutes to join the cluster and start
 the tasks; until then `/api/*` returns 502/503.
 
@@ -277,7 +277,7 @@ CloudWatch dashboard: `terraform -chdir=infra output dashboard_url`.
 
 | Service | Usage | Free Tier coverage |
 |---|---|---|
-| EC2 t3.micro × 1–2 (ECS container instances) | ASG min 1 / max 2, 30 GB gp3 | 750 h/month covers 1 instance full time; the 2nd one only runs when tasks no longer fit (or with `asg_min_size=2`) |
+| EC2 t3.micro × 2 (ECS container instances) | ASG min 2 / max 2, 30 GB gp3 each | 750 h/month covers 1 instance full time; the 2nd one is billed (or `asg_min_size=1`) |
 | ECS | cluster, 2 services (shop ×2, admin ×1 tasks), capacity provider | no charge on EC2; all tasks fit on one t3.micro |
 | ECR | 1 repository, last 5 images | 500 MB/month (12 months) |
 | ALB | 1 ALB | 750 h + 15 LCU/month (12-month legacy Free Tier). **Its public IPv4 addresses are billed** (~0.005 USD/h each ≈ 0.25 USD/day) |

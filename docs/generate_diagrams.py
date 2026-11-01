@@ -120,7 +120,7 @@ s.node(720, 180, 370, 66, "Application Load Balancer", ["only reachable from Clo
 s.parts.append(f"<rect x='715' y='268' width='380' height='140' fill='none' stroke='{C['compute']}' stroke-width='1.5' stroke-dasharray='6 4'/>")
 s.node(725, 300, 178, 84, "shop-api", ["Express · ×2 tasks", "default listener rule", "task role: DDB, SNS"], "compute", "ECS")
 s.node(910, 300, 178, 84, "admin-api", ["Express · ×1 task", "/admin/api/* rule", "checks Cognito JWT"], "compute", "ECS")
-s.text(905, 400, "ECS cluster on EC2 · ASG t3.micro 1–2", 11.5, C["compute"], "700", "middle")
+s.text(905, 400, "ECS cluster on EC2 · ASG t3.micro ×2 (2 AZs)", 11.5, C["compute"], "700", "middle")
 
 s.node(1150, 125, 260, 100, "Amazon Cognito", ["customers pool: sign in/up", "admins pool: hosted login", "groups: admins / owners"], "sec", "COG")
 
@@ -133,7 +133,6 @@ s.node(460, 860, 200, 70, "Account baseline", ["CloudTrail → S3", "Budgets ale
 s.node(700, 470, 210, 84, "DynamoDB products", ["catalog (back-office owned)", "atomic stock updates"], "db", "DDB")
 s.node(950, 470, 210, 96, "DynamoDB orders", ["orders + status history", "by_month · by_customer", "stream NEW_AND_OLD"], "db", "DDB")
 s.node(1210, 470, 210, 70, "SNS order-events", ["topic · encrypted"], "integ", "SNS")
-s.node(1450, 470, 210, 70, "Shop owner", ["email subscription", "all order events"], "user", "@")
 
 s.node(700, 610, 210, 70, "audit-stream", ["Lambda · stream consumer", "batch 25 · bisect on error"], "compute", "λ")
 s.node(700, 740, 210, 84, "S3 audit", ["partitioned by date", "versioned · 90 d expiry"], "storage", "S3")
@@ -171,7 +170,6 @@ s.label(900, 445, "read / write")
 s.label(1215, 445, "publish events")
 
 # event pipeline
-s.arrow([(1420, 505), (1450, 505)])
 s.arrow([(1055, 566), (1055, 590), (805, 590), (805, 610)], "stream", at=(930, 590))
 s.arrow([(805, 680), (805, 740)], "JSON per change", at=(805, 710))
 s.arrow([(1280, 540), (1280, 610)], "ORDER_PLACED", at=(1280, 575))

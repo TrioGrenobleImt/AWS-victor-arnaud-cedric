@@ -105,13 +105,6 @@ resource "aws_sns_topic_subscription" "customer_emails" {
   filter_policy        = jsonencode({ event_type = ["ORDER_PLACED", "ORDER_PACKED", "ORDER_SHIPPED", "ORDER_CANCELLED"] })
 }
 
-resource "aws_sns_topic_subscription" "orders_email" {
-  count     = var.notification_email != "" ? 1 : 0
-  topic_arn = aws_sns_topic.orders.arn
-  protocol  = "email"
-  endpoint  = var.notification_email
-}
-
 # SNS topics use the AWS managed key: publishers need to use it through SNS.
 data "aws_iam_policy_document" "sns_kms" {
   statement {

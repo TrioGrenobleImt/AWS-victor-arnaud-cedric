@@ -27,6 +27,7 @@ locals {
       timeout     = 15
       environment = {
         SENDER_EMAIL = var.sender_email
+        SHOP_URL     = "https://${aws_cloudfront_distribution.main.domain_name}" # "Visit the shop" button
       }
     }
   } : {})

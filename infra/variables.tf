@@ -11,7 +11,7 @@ variable "project" {
 }
 
 variable "notification_email" {
-  description = "Email for budget alerts, alarms and order notifications (leave empty to skip). SNS subscriptions must be confirmed from the inbox."
+  description = "Email for budget alerts and alarms (leave empty to skip). SNS subscriptions must be confirmed from the inbox."
   type        = string
   default     = ""
 }
@@ -54,9 +54,9 @@ variable "instance_type" {
 }
 
 variable "asg_min_size" {
-  description = "Minimum container instances. 1 stays within the 750 h/month Free Tier; 2 spreads tasks over 2 AZs (high availability)."
+  description = "Minimum container instances. 2 spreads tasks over 2 AZs behind the ALB (high availability); 1 halves the EC2 cost."
   type        = number
-  default     = 1
+  default     = 2
 }
 
 variable "asg_max_size" {

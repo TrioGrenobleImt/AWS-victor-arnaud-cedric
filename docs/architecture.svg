@@ -54,7 +54,7 @@
 <text x='962' y='358' font-size='11.5' fill='#5f6b7a'>/admin/api/* rule</text>
 <text x='962' y='373' font-size='11.5' fill='#5f6b7a'>checks Cognito JWT</text>
 </g>
-<text x='905' y='400' font-size='11.5' font-weight='700' fill='#ED7100' text-anchor='middle'>ECS cluster on EC2 · ASG t3.micro 1–2</text>
+<text x='905' y='400' font-size='11.5' font-weight='700' fill='#ED7100' text-anchor='middle'>ECS cluster on EC2 · ASG t3.micro ×2 (2 AZs)</text>
 <g><rect x='1150' y='125' width='260' height='100' rx='6' fill='#fff' stroke='#DD344C' stroke-width='1.6'/><rect x='1160' y='137' width='34' height='34' rx='4' fill='#DD344C'/><text x='1177' y='158' font-size='10.5' font-weight='700' fill='#fff' text-anchor='middle'>COG</text><text x='1202' y='151' font-size='13.5' font-weight='700' fill='#16191f'>Amazon Cognito</text>
 <text x='1202' y='168' font-size='11.5' fill='#5f6b7a'>customers pool: sign in/up</text>
 <text x='1202' y='183' font-size='11.5' fill='#5f6b7a'>admins pool: hosted login</text>
@@ -83,10 +83,6 @@
 </g>
 <g><rect x='1210' y='470' width='210' height='70' rx='6' fill='#fff' stroke='#E7157B' stroke-width='1.6'/><rect x='1220' y='482' width='34' height='34' rx='4' fill='#E7157B'/><text x='1237' y='503' font-size='10.5' font-weight='700' fill='#fff' text-anchor='middle'>SNS</text><text x='1262' y='496' font-size='13.5' font-weight='700' fill='#16191f'>SNS order-events</text>
 <text x='1262' y='513' font-size='11.5' fill='#5f6b7a'>topic · encrypted</text>
-</g>
-<g><rect x='1450' y='470' width='210' height='70' rx='6' fill='#fff' stroke='#232F3E' stroke-width='1.6'/><rect x='1460' y='482' width='34' height='34' rx='4' fill='#232F3E'/><text x='1477' y='503' font-size='10.5' font-weight='700' fill='#fff' text-anchor='middle'>@</text><text x='1502' y='496' font-size='13.5' font-weight='700' fill='#16191f'>Shop owner</text>
-<text x='1502' y='513' font-size='11.5' fill='#5f6b7a'>email subscription</text>
-<text x='1502' y='528' font-size='11.5' fill='#5f6b7a'>all order events</text>
 </g>
 <g><rect x='700' y='610' width='210' height='70' rx='6' fill='#fff' stroke='#ED7100' stroke-width='1.6'/><rect x='710' y='622' width='34' height='34' rx='4' fill='#ED7100'/><text x='727' y='643' font-size='10.5' font-weight='700' fill='#fff' text-anchor='middle'>λ</text><text x='752' y='636' font-size='13.5' font-weight='700' fill='#16191f'>audit-stream</text>
 <text x='752' y='653' font-size='11.5' fill='#5f6b7a'>Lambda · stream consumer</text>
@@ -138,7 +134,6 @@
 <path d='M805,445 L805,470' fill='none' stroke='#414d5c' stroke-width='1.6' marker-end='url(#a)'/>
 <path d='M1055,445 L1055,470' fill='none' stroke='#414d5c' stroke-width='1.6' marker-end='url(#a)'/>
 <path d='M1315,445 L1315,470' fill='none' stroke='#414d5c' stroke-width='1.6' marker-end='url(#a)'/>
-<path d='M1420,505 L1450,505' fill='none' stroke='#414d5c' stroke-width='1.6' marker-end='url(#a)'/>
 <path d='M1055,566 L1055,590 L805,590 L805,610' fill='none' stroke='#414d5c' stroke-width='1.6' marker-end='url(#a)'/>
 <path d='M805,680 L805,740' fill='none' stroke='#414d5c' stroke-width='1.6' marker-end='url(#a)'/>
 <path d='M1280,540 L1280,610' fill='none' stroke='#414d5c' stroke-width='1.6' marker-end='url(#a)'/>

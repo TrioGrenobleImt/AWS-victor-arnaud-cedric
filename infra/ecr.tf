@@ -42,10 +42,7 @@ resource "terraform_data" "api_image" {
 
   provisioner "local-exec" {
     working_dir = local.backend_dir
-    command     = <<-EOT
-      set -e
-      aws ecr get-login-password --region ${var.region} | docker login --username AWS --password-stdin ${split("/", aws_ecr_repository.api.repository_url)[0]}
-      docker buildx build --platform linux/amd64 --provenance=false -t ${local.api_image} --push .
-    EOT
+    # One line chained with && so it runs the same under sh (Linux/macOS) and cmd.exe (Windows).
+    command = "aws ecr get-login-password --region ${var.region} | docker login --username AWS --password-stdin ${split("/", aws_ecr_repository.api.repository_url)[0]} && docker buildx build --platform linux/amd64 --provenance=false -t ${local.api_image} --push ."
   }
 }
