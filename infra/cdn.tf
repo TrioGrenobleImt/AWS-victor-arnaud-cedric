@@ -7,7 +7,6 @@
 # accepts CloudFront traffic (managed prefix list).
 locals {
   cache_policy_optimized         = "658327ea-f89d-4fab-a63d-7e88639e58f6" # Managed-CachingOptimized
-  cache_policy_disabled          = "4135ea2d-6df8-44a3-9df3-4b5a84be39ad" # Managed-CachingDisabled
   origin_request_all_except_host = "b689b0a8-53d0-40ab-baf2-68738e2966ac" # Managed-AllViewerExceptHostHeader
 
   backoffice_url = "https://${aws_cloudfront_distribution.backoffice.domain_name}/"
@@ -24,6 +23,30 @@ resource "aws_cloudfront_origin_access_control" "web" {
 # reach the origin, which CloudFront only forwards when it is in the cache key.
 resource "aws_cloudfront_cache_policy" "admin_api" {
   name        = "${var.project}-admin-api"
+  min_ttl     = 0
+  default_ttl = 0
+  max_ttl     = 1 # > 0 is required to add a header; responses are Cache-Control: no-store
+
+  parameters_in_cache_key_and_forwarded_to_origin {
+    headers_config {
+      header_behavior = "whitelist"
+      headers {
+        items = ["Authorization"]
+      }
+    }
+    query_strings_config {
+      query_string_behavior = "all"
+    }
+    cookies_config {
+      cookie_behavior = "none"
+    }
+  }
+}
+
+# Shop API: same reason, for the customer token on GET /api/me/orders (the
+# managed CachingDisabled policy can't forward Authorization on GET requests).
+resource "aws_cloudfront_cache_policy" "shop_api" {
+  name        = "${var.project}-shop-api"
   min_ttl     = 0
   default_ttl = 0
   max_ttl     = 1 # > 0 is required to add a header; responses are Cache-Control: no-store
@@ -102,7 +125,7 @@ resource "aws_cloudfront_distribution" "main" {
     viewer_protocol_policy   = "https-only"
     allowed_methods          = ["DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"]
     cached_methods           = ["GET", "HEAD"]
-    cache_policy_id          = local.cache_policy_disabled
+    cache_policy_id          = aws_cloudfront_cache_policy.shop_api.id
     origin_request_policy_id = local.origin_request_all_except_host
   }
 

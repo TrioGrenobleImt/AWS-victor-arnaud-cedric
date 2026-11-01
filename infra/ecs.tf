@@ -1,6 +1,7 @@
 # --- ECS cluster on EC2 (Free Tier t3.micro container instances) -------------
 # EC2 launch type rather than Fargate: Fargate has no free tier, while the ECS
-# control plane is free and the instances fit the 750 h/month t3.micro offer.
+# control plane is free and the 750 h/month t3.micro offer covers one of the two
+# instances (one per AZ for high availability).
 resource "aws_ecs_cluster" "main" {
   name = var.project
 

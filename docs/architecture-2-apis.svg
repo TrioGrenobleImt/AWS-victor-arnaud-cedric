@@ -1,0 +1,108 @@
+<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1420 870' width='1420' height='870' font-family='Helvetica, Arial, sans-serif'>
+<defs><marker id='a' viewBox='0 0 10 10' refX='9' refY='5' markerWidth='7' markerHeight='7' orient='auto-start-reverse'><path d='M0,0 L10,5 L0,10 z' fill='#414d5c'/></marker><marker id='ad' viewBox='0 0 10 10' refX='9' refY='5' markerWidth='7' markerHeight='7' orient='auto-start-reverse'><path d='M0,0 L10,5 L0,10 z' fill='#8d99a8'/></marker></defs>
+<rect width='1420' height='870' fill='#ffffff'/>
+<text x='30' y='42' font-size='24' font-weight='700' fill='#16191f'>FISA Shop — 2 · APIs and sign-in</text>
+<text x='30' y='66' font-size='14' fill='#5f6b7a'>Both APIs run from one image on ECS (EC2 instances); each checks access tokens from its own Cognito user pool</text>
+<g><rect x='30' y='140' width='170' height='76' rx='6' fill='#fff' stroke='#232F3E' stroke-width='1.6'/><rect x='40' y='152' width='34' height='34' rx='4' fill='#232F3E'/><text x='57' y='173' font-size='10.5' font-weight='700' fill='#fff' text-anchor='middle'>USR</text><text x='82' y='166' font-size='13.5' font-weight='700' fill='#16191f'>Customers</text>
+<text x='82' y='183' font-size='11.5' fill='#5f6b7a'>web browser</text>
+<text x='82' y='198' font-size='11.5' fill='#5f6b7a'>optional sign-in</text>
+</g>
+<g><rect x='30' y='470' width='170' height='76' rx='6' fill='#fff' stroke='#232F3E' stroke-width='1.6'/><rect x='40' y='482' width='34' height='34' rx='4' fill='#232F3E'/><text x='57' y='503' font-size='10.5' font-weight='700' fill='#fff' text-anchor='middle'>USR</text><text x='82' y='496' font-size='13.5' font-weight='700' fill='#16191f'>Back office</text>
+<text x='82' y='513' font-size='11.5' fill='#5f6b7a'>owner / staff</text>
+<text x='82' y='528' font-size='11.5' fill='#5f6b7a'>hosted login (PKCE)</text>
+</g>
+<g><rect x='250' y='110' width='230' height='96' rx='6' fill='#fff' stroke='#DD344C' stroke-width='1.6'/><rect x='260' y='122' width='34' height='34' rx='4' fill='#DD344C'/><text x='277' y='143' font-size='10.5' font-weight='700' fill='#fff' text-anchor='middle'>COG</text><text x='302' y='136' font-size='13.5' font-weight='700' fill='#16191f'>Cognito customers</text>
+<text x='302' y='153' font-size='11.5' fill='#5f6b7a'>sign in / sign up</text>
+<text x='302' y='168' font-size='11.5' fill='#5f6b7a'>own page, Cognito API</text>
+<text x='302' y='183' font-size='11.5' fill='#5f6b7a'>anyone can sign up</text>
+</g>
+<g opacity='0.55'><rect x='250' y='300' width='230' height='96' rx='6' fill='#fff' stroke='#8C4FFF' stroke-width='1.6' stroke-dasharray='6 4'/><rect x='260' y='312' width='34' height='34' rx='4' fill='#8C4FFF'/><text x='277' y='333' font-size='10.5' font-weight='700' fill='#fff' text-anchor='middle'>CF</text><text x='302' y='326' font-size='13.5' font-weight='700' fill='#16191f'>CloudFront</text>
+<text x='302' y='343' font-size='11.5' fill='#5f6b7a'>storefront: /api/*</text>
+<text x='302' y='358' font-size='11.5' fill='#5f6b7a'>back office: /admin/api/*</text>
+<text x='302' y='373' font-size='11.5' fill='#5f6b7a'>see 1 · web entry</text>
+</g>
+<g><rect x='250' y='500' width='230' height='96' rx='6' fill='#fff' stroke='#DD344C' stroke-width='1.6'/><rect x='260' y='512' width='34' height='34' rx='4' fill='#DD344C'/><text x='277' y='533' font-size='10.5' font-weight='700' fill='#fff' text-anchor='middle'>COG</text><text x='302' y='526' font-size='13.5' font-weight='700' fill='#16191f'>Cognito admins</text>
+<text x='302' y='543' font-size='11.5' fill='#5f6b7a'>hosted login (PKCE)</text>
+<text x='302' y='558' font-size='11.5' fill='#5f6b7a'>groups: admins / owners</text>
+<text x='302' y='573' font-size='11.5' fill='#5f6b7a'>no self sign-up</text>
+</g>
+<rect x='530' y='120' width='560' height='520' fill='none' stroke='#8C4FFF' stroke-width='1.5'/>
+<rect x='530' y='120' width='26' height='26' fill='#8C4FFF'/><text x='543' y='137' font-size='10' font-weight='700' fill='#fff' text-anchor='middle'>VPC</text>
+<text x='564' y='138' font-size='13' font-weight='700' fill='#8C4FFF'>VPC 10.10.0.0/16 · 2 public subnets (2 AZs)</text>
+<g><rect x='560' y='290' width='200' height='120' rx='6' fill='#fff' stroke='#8C4FFF' stroke-width='1.6'/><rect x='570' y='302' width='34' height='34' rx='4' fill='#8C4FFF'/><text x='587' y='323' font-size='10.5' font-weight='700' fill='#fff' text-anchor='middle'>ALB</text><text x='612' y='316' font-size='13.5' font-weight='700' fill='#16191f'>ALB</text>
+<text x='612' y='333' font-size='11.5' fill='#5f6b7a'>only from CloudFront</text>
+<text x='612' y='348' font-size='11.5' fill='#5f6b7a'>health /api/health</text>
+<text x='612' y='363' font-size='11.5' fill='#5f6b7a'>dynamic host ports</text>
+</g>
+<rect x='800' y='140' width='230' height='470' fill='none' stroke='#ED7100' stroke-width='1.5' stroke-dasharray='6 4'/>
+<text x='915' y='160' font-size='11.5' font-weight='700' fill='#ED7100' text-anchor='middle'>ECS cluster on EC2</text>
+<g><rect x='815' y='175' width='200' height='110' rx='6' fill='#fff' stroke='#ED7100' stroke-width='1.6'/><rect x='825' y='187' width='34' height='34' rx='4' fill='#ED7100'/><text x='842' y='208' font-size='10.5' font-weight='700' fill='#fff' text-anchor='middle'>ECS</text><text x='867' y='201' font-size='13.5' font-weight='700' fill='#16191f'>shop-api</text>
+<text x='867' y='218' font-size='11.5' fill='#5f6b7a'>Express · 2–4 tasks</text>
+<text x='867' y='233' font-size='11.5' fill='#5f6b7a'>CPU target 60 %</text>
+<text x='867' y='248' font-size='11.5' fill='#5f6b7a'>customer token optional</text>
+<text x='867' y='263' font-size='11.5' fill='#5f6b7a'>role: DDB, SNS</text>
+</g>
+<g><rect x='815' y='400' width='200' height='126' rx='6' fill='#fff' stroke='#ED7100' stroke-width='1.6'/><rect x='825' y='412' width='34' height='34' rx='4' fill='#ED7100'/><text x='842' y='433' font-size='10.5' font-weight='700' fill='#fff' text-anchor='middle'>ECS</text><text x='867' y='426' font-size='13.5' font-weight='700' fill='#16191f'>admin-api</text>
+<text x='867' y='443' font-size='11.5' fill='#5f6b7a'>Express · 1 task</text>
+<text x='867' y='458' font-size='11.5' fill='#5f6b7a'>requires admins group</text>
+<text x='867' y='473' font-size='11.5' fill='#5f6b7a'>role: DDB, S3, SNS,</text>
+<text x='867' y='488' font-size='11.5' fill='#5f6b7a'>Cognito (team page)</text>
+</g>
+<text x='915' y='578' font-size='11.5' font-weight='400' fill='#5f6b7a' text-anchor='middle'>ASG 2× t3.micro · 1 per AZ</text>
+<text x='915' y='595' font-size='11.5' font-weight='400' fill='#5f6b7a' text-anchor='middle'>IMDSv2 hop limit 1 · no SSH</text>
+<g><rect x='1140' y='120' width='250' height='70' rx='6' fill='#fff' stroke='#C925D1' stroke-width='1.6'/><rect x='1150' y='132' width='34' height='34' rx='4' fill='#C925D1'/><text x='1167' y='153' font-size='10.5' font-weight='700' fill='#fff' text-anchor='middle'>DDB</text><text x='1192' y='146' font-size='13.5' font-weight='700' fill='#16191f'>DynamoDB products</text>
+<text x='1192' y='163' font-size='11.5' fill='#5f6b7a'>catalog · atomic stock updates</text>
+</g>
+<g><rect x='1140' y='210' width='250' height='96' rx='6' fill='#fff' stroke='#C925D1' stroke-width='1.6'/><rect x='1150' y='222' width='34' height='34' rx='4' fill='#C925D1'/><text x='1167' y='243' font-size='10.5' font-weight='700' fill='#fff' text-anchor='middle'>DDB</text><text x='1192' y='236' font-size='13.5' font-weight='700' fill='#16191f'>DynamoDB orders</text>
+<text x='1192' y='253' font-size='11.5' fill='#5f6b7a'>orders + status history</text>
+<text x='1192' y='268' font-size='11.5' fill='#5f6b7a'>by_month · by_customer</text>
+<text x='1192' y='283' font-size='11.5' fill='#5f6b7a'>stream → 3 · events</text>
+</g>
+<g><rect x='1140' y='326' width='250' height='84' rx='6' fill='#fff' stroke='#E7157B' stroke-width='1.6'/><rect x='1150' y='338' width='34' height='34' rx='4' fill='#E7157B'/><text x='1167' y='359' font-size='10.5' font-weight='700' fill='#fff' text-anchor='middle'>SNS</text><text x='1192' y='352' font-size='13.5' font-weight='700' fill='#16191f'>SNS order-events</text>
+<text x='1192' y='369' font-size='11.5' fill='#5f6b7a'>shop: ORDER_PLACED</text>
+<text x='1192' y='384' font-size='11.5' fill='#5f6b7a'>admin: PACKED / SHIPPED / …</text>
+</g>
+<g><rect x='1140' y='430' width='250' height='70' rx='6' fill='#fff' stroke='#7AA116' stroke-width='1.6'/><rect x='1150' y='442' width='34' height='34' rx='4' fill='#7AA116'/><text x='1167' y='463' font-size='10.5' font-weight='700' fill='#fff' text-anchor='middle'>S3</text><text x='1192' y='456' font-size='13.5' font-weight='700' fill='#16191f'>S3 images</text>
+<text x='1192' y='473' font-size='11.5' fill='#5f6b7a'>covers: presigned POST</text>
+<text x='1192' y='488' font-size='11.5' fill='#5f6b7a'>issued by admin-api</text>
+</g>
+<g><rect x='1140' y='530' width='250' height='70' rx='6' fill='#fff' stroke='#7AA116' stroke-width='1.6'/><rect x='1150' y='542' width='34' height='34' rx='4' fill='#7AA116'/><text x='1167' y='563' font-size='10.5' font-weight='700' fill='#fff' text-anchor='middle'>S3</text><text x='1192' y='556' font-size='13.5' font-weight='700' fill='#16191f'>S3 documents</text>
+<text x='1192' y='573' font-size='11.5' fill='#5f6b7a'>packing slips</text>
+<text x='1192' y='588' font-size='11.5' fill='#5f6b7a'>5-min presigned GET links</text>
+</g>
+<g><rect x='560' y='700' width='200' height='84' rx='6' fill='#fff' stroke='#ED7100' stroke-width='1.6'/><rect x='570' y='712' width='34' height='34' rx='4' fill='#ED7100'/><text x='587' y='733' font-size='10.5' font-weight='700' fill='#fff' text-anchor='middle'>ECR</text><text x='612' y='726' font-size='13.5' font-weight='700' fill='#16191f'>Amazon ECR</text>
+<text x='612' y='743' font-size='11.5' fill='#5f6b7a'>one image, two entry points</text>
+<text x='612' y='758' font-size='11.5' fill='#5f6b7a'>scan on push</text>
+</g>
+<path d='M200,165 L250,165' fill='none' stroke='#414d5c' stroke-width='1.6' marker-end='url(#a)'/>
+<path d='M200,520 L250,520' fill='none' stroke='#414d5c' stroke-width='1.6' marker-end='url(#a)'/>
+<path d='M115,216 L115,330 L250,330' fill='none' stroke='#414d5c' stroke-width='1.6' marker-end='url(#a)'/>
+<path d='M115,470 L115,370 L250,370' fill='none' stroke='#414d5c' stroke-width='1.6' marker-end='url(#a)'/>
+<path d='M480,350 L560,350' fill='none' stroke='#414d5c' stroke-width='1.6' marker-end='url(#a)'/>
+<path d='M660,290 L660,230 L815,230' fill='none' stroke='#414d5c' stroke-width='1.6' marker-end='url(#a)'/>
+<path d='M660,410 L660,460 L815,460' fill='none' stroke='#414d5c' stroke-width='1.6' marker-end='url(#a)'/>
+<path d='M990,175 L990,100 L365,100 L365,110' fill='none' stroke='#8d99a8' stroke-width='1.6' stroke-dasharray='6 4' marker-end='url(#ad)'/>
+<path d='M830,526 L830,670 L365,670 L365,596' fill='none' stroke='#414d5c' stroke-width='1.6' marker-end='url(#a)'/>
+<path d='M760,742 L980,742 L980,610' fill='none' stroke='#8d99a8' stroke-width='1.6' stroke-dasharray='6 4' marker-end='url(#ad)'/>
+<path d='M1015,230 L1105,230' fill='none' stroke='#414d5c' stroke-width='1.6'/>
+<path d='M1015,420 L1105,420' fill='none' stroke='#414d5c' stroke-width='1.6'/>
+<path d='M1105,155 L1105,420' fill='none' stroke='#414d5c' stroke-width='1.6'/>
+<path d='M1105,155 L1140,155' fill='none' stroke='#414d5c' stroke-width='1.6' marker-end='url(#a)'/>
+<path d='M1105,258 L1140,258' fill='none' stroke='#414d5c' stroke-width='1.6' marker-end='url(#a)'/>
+<path d='M1105,368 L1140,368' fill='none' stroke='#414d5c' stroke-width='1.6' marker-end='url(#a)'/>
+<path d='M1015,465 L1140,465' fill='none' stroke='#414d5c' stroke-width='1.6' marker-end='url(#a)'/>
+<path d='M1015,505 L1100,505 L1100,565 L1140,565' fill='none' stroke='#414d5c' stroke-width='1.6' marker-end='url(#a)'/>
+<line x1='30' y1='822' x2='1390' y2='822' stroke='#e9ebed'/>
+<text x='30' y='844' font-size='12' font-weight='400' fill='#414d5c' text-anchor='start'>Two user pools so a customer account can never reach the admin API · owners can also invite, disable and remove staff.</text>
+<path d='M1090,840 L1130,840' stroke='#414d5c' stroke-width='1.6' marker-end='url(#a)'/>
+<text x='1138' y='844' font-size='12' font-weight='400' fill='#414d5c' text-anchor='start'>request / event</text>
+<path d='M1250,840 L1290,840' stroke='#8d99a8' stroke-width='1.6' stroke-dasharray='6 4' marker-end='url(#ad)'/>
+<text x='1298' y='844' font-size='12' font-weight='400' fill='#414d5c' text-anchor='start'>config / optional</text>
+<rect x='159.6' y='321' width='40.800000000000004' height='17' rx='3' fill='#fff' stroke='#d5dbe1'/><text x='180' y='334' font-size='11' fill='#414d5c' text-anchor='middle'>HTTPS</text>
+<rect x='159.6' y='361' width='40.800000000000004' height='17' rx='3' fill='#fff' stroke='#d5dbe1'/><text x='180' y='374' font-size='11' fill='#414d5c' text-anchor='middle'>HTTPS</text>
+<rect x='682.72' y='221' width='108.56' height='17' rx='3' fill='#fff' stroke='#d5dbe1'/><text x='737' y='234' font-size='11' fill='#414d5c' text-anchor='middle'>/api/* (default)</text>
+<rect x='695.04' y='451' width='83.92' height='17' rx='3' fill='#fff' stroke='#d5dbe1'/><text x='737' y='464' font-size='11' fill='#414d5c' text-anchor='middle'>/admin/api/*</text>
+<rect x='560.3199999999999' y='91' width='139.36' height='17' rx='3' fill='#fff' stroke='#d5dbe1'/><text x='630' y='104' font-size='11' fill='#414d5c' text-anchor='middle'>verify customer token</text>
+<rect x='514.92' y='661' width='170.16000000000003' height='17' rx='3' fill='#fff' stroke='#d5dbe1'/><text x='600' y='674' font-size='11' fill='#414d5c' text-anchor='middle'>verify token · manage team</text>
+<rect x='834.2' y='733' width='71.60000000000001' height='17' rx='3' fill='#fff' stroke='#d5dbe1'/><text x='870' y='746' font-size='11' fill='#414d5c' text-anchor='middle'>pull image</text>
+</svg>

@@ -32,7 +32,7 @@ variable "admin_email" {
 variable "monthly_budget_usd" {
   description = "Monthly cost budget. Alerts fire at 80% (actual) and 100% (forecast). Needs notification_email."
   type        = number
-  default     = 1
+  default     = 25
 }
 
 variable "enable_cloudtrail" {
@@ -54,7 +54,7 @@ variable "instance_type" {
 }
 
 variable "asg_min_size" {
-  description = "Minimum container instances. 2 spreads tasks over 2 AZs behind the ALB (high availability); 1 halves the EC2 cost."
+  description = "Minimum container instances. 2 spreads tasks over 2 AZs (high availability; the 750 h/month Free Tier covers 1 of them); 1 stays fully free."
   type        = number
   default     = 2
 }

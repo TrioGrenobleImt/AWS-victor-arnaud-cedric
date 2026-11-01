@@ -16,10 +16,6 @@ output "ecs_service" {
   value = aws_ecs_service.service["shop-api"].name
 }
 
-output "admin_service" {
-  value = aws_ecs_service.service["admin-api"].name
-}
-
 output "user_pool_id" {
   value = aws_cognito_user_pool.admin.id
 }
@@ -32,32 +28,8 @@ output "documents_bucket" {
   value = aws_s3_bucket.documents.id
 }
 
-output "asg_name" {
-  value = aws_autoscaling_group.ecs.name
-}
-
-output "api_image" {
-  value = local.api_image
-}
-
-output "images_bucket" {
-  value = aws_s3_bucket.images.id
-}
-
 output "audit_bucket" {
   value = aws_s3_bucket.audit.id
-}
-
-output "orders_table" {
-  value = aws_dynamodb_table.orders.name
-}
-
-output "order_topic_arn" {
-  value = aws_sns_topic.orders.arn
-}
-
-output "cloudtrail_bucket" {
-  value = var.enable_cloudtrail ? aws_s3_bucket.trail[0].id : null
 }
 
 output "dashboard_url" {

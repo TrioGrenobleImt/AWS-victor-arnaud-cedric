@@ -54,7 +54,7 @@
 <text x='962' y='358' font-size='11.5' fill='#5f6b7a'>/admin/api/* rule</text>
 <text x='962' y='373' font-size='11.5' fill='#5f6b7a'>checks Cognito JWT</text>
 </g>
-<text x='905' y='400' font-size='11.5' font-weight='700' fill='#ED7100' text-anchor='middle'>ECS cluster on EC2 · ASG t3.micro ×2 (2 AZs)</text>
+<text x='905' y='400' font-size='11.5' font-weight='700' fill='#ED7100' text-anchor='middle'>ECS cluster on EC2 · ASG 2× t3.micro, 1 per AZ</text>
 <g><rect x='1150' y='125' width='260' height='100' rx='6' fill='#fff' stroke='#DD344C' stroke-width='1.6'/><rect x='1160' y='137' width='34' height='34' rx='4' fill='#DD344C'/><text x='1177' y='158' font-size='10.5' font-weight='700' fill='#fff' text-anchor='middle'>COG</text><text x='1202' y='151' font-size='13.5' font-weight='700' fill='#16191f'>Amazon Cognito</text>
 <text x='1202' y='168' font-size='11.5' fill='#5f6b7a'>customers pool: sign in/up</text>
 <text x='1202' y='183' font-size='11.5' fill='#5f6b7a'>admins pool: hosted login</text>
@@ -62,7 +62,7 @@
 </g>
 <g><rect x='460' y='610' width='200' height='84' rx='6' fill='#fff' stroke='#ED7100' stroke-width='1.6'/><rect x='470' y='622' width='34' height='34' rx='4' fill='#ED7100'/><text x='487' y='643' font-size='10.5' font-weight='700' fill='#fff' text-anchor='middle'>ECR</text><text x='512' y='636' font-size='13.5' font-weight='700' fill='#16191f'>Amazon ECR</text>
 <text x='512' y='653' font-size='11.5' fill='#5f6b7a'>API image (shop + admin)</text>
-<text x='512' y='668' font-size='11.5' fill='#5f6b7a'>scan on push · lifecycle</text>
+<text x='512' y='668' font-size='11.5' fill='#5f6b7a'>scan on push · immutable tags</text>
 </g>
 <g><rect x='460' y='740' width='200' height='84' rx='6' fill='#fff' stroke='#E7157B' stroke-width='1.6'/><rect x='470' y='752' width='34' height='34' rx='4' fill='#E7157B'/><text x='487' y='773' font-size='10.5' font-weight='700' fill='#fff' text-anchor='middle'>CW</text><text x='512' y='766' font-size='13.5' font-weight='700' fill='#16191f'>CloudWatch</text>
 <text x='512' y='783' font-size='11.5' fill='#5f6b7a'>logs · alarms · dashboard</text>

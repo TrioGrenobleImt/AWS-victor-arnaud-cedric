@@ -17,7 +17,7 @@ Tier, combining **containers on EC2 (ECS)** for the request/response API and
 | **Lambda** (Node.js) | Packing slips (SQS), customer emails via SES (SQS), audit trail (DynamoDB Stream) | Triggered by events, bursty, no idle cost |
 | **S3 + CloudFront** | Storefront and back office (Vite), product images, packing slips | Static content at the edge, single HTTPS entry point |
 | **Cognito** | Two user pools (free Lite tier): back-office sign-in (hosted login, `admins` / `owners` groups) and customer sign-in/up for the storefront (own page, Cognito API) | Managed users/passwords, kept apart so a customer can never reach the admin API |
-| **DynamoDB** | Products and orders (+ stream, `by_month` index) | Serverless, always-free 25 RCU/WCU |
+| **DynamoDB** | Products and orders (+ stream, `by_month`, `by_customer` indexes) | Serverless, always-free 25 RCU/WCU |
 
 Both APIs and the Lambdas use the same code for the order domain
 (`backend/lib/`):
@@ -54,7 +54,7 @@ Both APIs and the Lambdas use the same code for the order domain
 │   ├── lambda.tf             #   Lambda functions + triggers
 │   ├── dynamodb.tf, messaging.tf, storage.tf, cdn.tf, monitoring.tf
 ├── tests/                    # test.sh (end to end), failover.sh
-└── docs/                     # Architecture diagram (architecture.svg, regenerate with generate_diagrams.py)
+└── docs/                     # Architecture diagrams (overview + 4 sections, regenerate with generate_diagrams.py)
 ```
 
 ## Addresses and API
@@ -104,6 +104,16 @@ Back-office API (`Authorization: Bearer <Cognito access token>`, `admins` group)
 
 ## Architecture
 
+The full picture is [docs/architecture.svg](docs/architecture.svg); four
+smaller diagrams each zoom in on one part of it:
+
+| Diagram | Shows |
+|---|---|
+| [1 · web entry](docs/architecture-1-web.svg) | The two CloudFront distributions, the S3 buckets they serve and the path to the ALB |
+| [2 · APIs and sign-in](docs/architecture-2-apis.svg) | ALB, shop-api and admin-api on ECS, the two Cognito user pools, what each API reads and writes |
+| [3 · event-driven work](docs/architecture-3-events.svg) | SNS fan-out, the SQS queues and Lambdas (packing slip, customer emails) and the audit trail |
+| [4 · build, monitoring and guardrails](docs/architecture-4-ops.svg) | Image build and deploy, CloudWatch alarms, CloudTrail and the cost budget |
+
 ```mermaid
 flowchart LR
     U((Customers)) -->|HTTPS| CF[CloudFront<br/>storefront]
@@ -117,7 +127,7 @@ flowchart LR
     subgraph VPC 10.10.0.0/16 — 2 AZs, public subnets
       ALB -->|default| T1[ECS shop-api ×2]
       ALB -->|/admin/api/*| T2[ECS admin-api]
-      T1 & T2 -.- EC2[ECS capacity provider<br/>ASG t3.micro ×2]
+      T1 & T2 -.- EC2[ECS capacity provider<br/>ASG 2× t3.micro, one per AZ]
     end
     ECR[(ECR)] -.->|image| T1 & T2
     T2 -.->|verify JWT| COG
@@ -164,12 +174,15 @@ SNS message filtering keeps `ORDER_PACKED`, `ORDER_SHIPPED` and `ORDER_CANCELLED
 failed messages are retried 3 times and then moved to a dead-letter queue
 (which triggers a CloudWatch alarm).
 
-* **High availability**: 2 API tasks behind the ALB (health checks on
-  `/api/health`, replaced automatically, deployment circuit breaker with
-  rollback); 2 container instances in 2 AZs behind the ALB, tasks spread across
-  them (`asg_min_size=1` halves the EC2 cost); task auto scaling on CPU (60 %) and the ECS capacity
-  provider adds an instance when tasks no longer fit. DynamoDB, SQS, SNS,
-  Lambda, S3 and CloudFront are multi-AZ or global by design.
+* **High availability**: 2 container instances, one per AZ, each running one
+  shop API task behind the ALB (health checks on `/api/health`, replaced
+  automatically, deployment circuit breaker with rollback), so losing a task,
+  an instance or an AZ keeps the shop up while ECS and the ASG replace it; the
+  single admin API task is restarted on the other instance (the back office is
+  internal, a short outage is acceptable); task auto scaling on CPU (60 %). DynamoDB, SQS,
+  SNS, Lambda, S3 and CloudFront are multi-AZ or global by design.
+  `-var asg_min_size=1` stays fully Free Tier but makes the instance a single
+  point of failure (a few minutes of 502/503 while the ASG replaces it).
 * **Streaming**: DynamoDB Streams → Lambda replaces Kafka/MSK at zero cost; the
   audit bucket is partitioned by date (`orders/dt=YYYY-MM-DD/…`) so it can be
   queried with Athena for reporting.
@@ -220,7 +233,7 @@ also manage accounts (invite, change role, disable, remove). Roles are the
 `admins` Cognito group (everyone) plus `owners`; owners can't change or remove
 their own account, so one owner always remains.
 Confirm the SNS subscription emails ("AWS Notification - Subscription
-Confirmation") to receive budget alerts and alarms. After the first
+Confirmation") to receive order confirmations and alarms. After the first
 apply, the container instance needs 2–3 minutes to join the cluster and start
 the tasks; until then `/api/*` returns 502/503.
 
@@ -277,17 +290,17 @@ CloudWatch dashboard: `terraform -chdir=infra output dashboard_url`.
 
 | Service | Usage | Free Tier coverage |
 |---|---|---|
-| EC2 t3.micro × 2 (ECS container instances) | ASG min 2 / max 2, 30 GB gp3 each | 750 h/month covers 1 instance full time; the 2nd one is billed (or `asg_min_size=1`) |
-| ECS | cluster, 2 services (shop ×2, admin ×1 tasks), capacity provider | no charge on EC2; all tasks fit on one t3.micro |
+| EC2 t3.micro × 2 (ECS container instances, one per AZ) | ASG min 2 / max 2, 30 GB gp3 each, 1 public IPv4 each | 750 h/month, 30 GB EBS and 750 h of public IPv4 cover 1 instance; **the 2nd one is billed** (~15 USD/month for instance + disk + IP). `asg_min_size=1` stays free |
+| ECS | cluster, 2 services (shop ×2, admin ×1 tasks), capacity provider | no charge on EC2 |
 | ECR | 1 repository, last 5 images | 500 MB/month (12 months) |
 | ALB | 1 ALB | 750 h + 15 LCU/month (12-month legacy Free Tier). **Its public IPv4 addresses are billed** (~0.005 USD/h each ≈ 0.25 USD/day) |
-| Lambda | 2 functions, arm64 128 MB | 1 M requests + 400 000 GB-s/month (always free) |
-| DynamoDB | 2 tables + 1 index × 5 RCU/WCU, Streams | 25 RCU/WCU + 25 GB + 2.5 M stream reads (always free) |
+| Lambda | 2–3 functions, arm64 128 MB | 1 M requests + 400 000 GB-s/month (always free) |
+| DynamoDB | 2 tables + 2 indexes × 5 RCU/WCU, Streams | 25 RCU/WCU + 25 GB + 2.5 M stream reads (always free) |
 | Cognito | Lite tier, hosted login | 10 000 monthly active users free |
 | CloudFront | 2 distributions (storefront, back office) | 1 TB + 10 M requests/month across all distributions (always free) |
 | S3 | website, images, documents, audit, trail | 5 GB (12 months) |
 | SNS / SQS | | 1 M publishes / 1 M requests (always free) |
-| CloudWatch | 6 alarms, 1 dashboard, logs 7 days | 10 alarms + 3 dashboards + 5 GB logs |
+| CloudWatch | 6–7 alarms, 1 dashboard, logs 7 days | 10 alarms + 3 dashboards + 5 GB logs |
 | CloudTrail | 1 trail, management events | first copy free |
 | Budgets | 1 budget | first 2 free |
 | KMS | AWS managed keys only | no monthly key fee |

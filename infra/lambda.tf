@@ -82,12 +82,6 @@ resource "aws_iam_role_policy_attachment" "lambda_logs" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
-resource "aws_iam_role_policy_attachment" "lambda_xray" {
-  for_each   = local.functions
-  role       = aws_iam_role.lambda[each.key].name
-  policy_arn = "arn:aws:iam::aws:policy/AWSXRayDaemonWriteAccess"
-}
-
 data "aws_iam_policy_document" "order_processor" {
   statement {
     actions   = ["sqs:ReceiveMessage", "sqs:DeleteMessage", "sqs:GetQueueAttributes"]
@@ -169,10 +163,6 @@ resource "aws_lambda_function" "fn" {
 
   environment {
     variables = each.value.environment
-  }
-
-  tracing_config {
-    mode = "Active" # X-Ray: 100k traces/month free
   }
 
   depends_on = [aws_cloudwatch_log_group.lambda, aws_iam_role_policy.lambda]
